@@ -2,47 +2,56 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
+import Faculty from '#models/faculty'
+import { Promotion } from '../types/promotion/index.js'
+import { Sexe } from '../types/sexe/index.js'
 
 export default class Student extends BaseModel {
-  @column({ isPrimary: true })
-  declare id: number
+    @column({ isPrimary: true })
+    declare id: number
 
-  @column()
-  declare userId: number
+    @column()
+    declare userId: number
 
-  @column()
-  declare firstName: string
+    @column()
+    declare firstName: string
 
-  @column()
-  declare name: string
+    @column()
+    declare name: string
 
-  @column()
-  declare lastName: string
+    @column()
+    declare lastName: string
 
-  @column()
-  declare gender: string
+    @column()
+    declare gender: Sexe
 
-  @column()
-  declare phoneNumber: string
+    @column()
+    declare phoneNumber: string
 
-  @column()
-  declare faculty: string
+    @column()
+    declare facultyCode: string
 
-  @column()
-  declare department: string
+    @belongsTo(() => Faculty, {
+        foreignKey: 'facultyCode',
+        localKey: 'code',
+    })
+    declare faculty: BelongsTo<typeof Faculty>
 
-  @column()
-  declare promotion: string
+    @column()
+    declare department: string
 
-  @column()
-  declare photoUrl: string
+    @column()
+    declare promotion: Promotion
 
-  @belongsTo(() => User)
-  declare user: BelongsTo<typeof User>
+    @column()
+    declare photoUrl: string
 
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
+    @belongsTo(() => User)
+    declare user: BelongsTo<typeof User>
 
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime
+    @column.dateTime({ autoCreate: true })
+    declare createdAt: DateTime
+
+    @column.dateTime({ autoCreate: true, autoUpdate: true })
+    declare updatedAt: DateTime
 }
