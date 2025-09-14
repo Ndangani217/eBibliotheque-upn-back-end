@@ -40,3 +40,9 @@ export const updateStudentValidator = vine.compile(
         photoUrl: vine.string().url().optional(),
     }),
 )
+
+export const assignStudentValidator = vine.compile(
+    vine.object({
+        studentId: vine.number(),
+    }),
+)

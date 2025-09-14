@@ -1,6 +1,5 @@
 import vine from '@vinejs/vine'
 
-
 export const loginValidator = vine.compile(
     vine.object({
         email: vine.string().email(),
@@ -14,5 +13,3 @@ export const updateAdminValidator = vine.compile(
         name: vine.string().minLength(3).optional(),
     }),
 )
-
-

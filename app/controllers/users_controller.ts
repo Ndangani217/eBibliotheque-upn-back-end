@@ -3,7 +3,6 @@ import User from '#models/user'
 import Student from '#models/student'
 import Admin from '#models/admin'
 import { Role } from '../types/role/index.js'
-import { Faculty } from '../types/faculty/faculty.js'
 //import crypto from 'node:crypto'
 //import Mail from '@adonisjs/mail/services/main'
 import { loginValidator } from '#validators/user'
@@ -63,7 +62,7 @@ export default class UsersController {
                 .first()
 
             if (!admin) return response.status(404).json({ message: 'Admin not found' })
-            return response.json({ status: 'success', message: 'Admin details', data: admin })
+            return response.created({ status: 'success', message: 'Admin details', data: admin })
         } catch (error) {
             console.error(error)
             return response.status(500).json({ error: 'Failed to get admin' })
@@ -76,7 +75,6 @@ export default class UsersController {
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
-            console.log(payload)
 
             //const verifyToken = crypto.randomBytes(32).toString('hex')
 
@@ -400,6 +398,85 @@ export default class UsersController {
         } catch (error) {
             console.error(error)
             return response.status(500).json({ status: 'error', message: 'Failed to logout' })
+        }
+    }
+    // -------------------------
+    // Rechercher des étudiants
+    // -------------------------
+    async searchStudents({ request, response }: HttpContext) {
+        try {
+            const { name, email, facultyCode } = request.qs()
+
+            const query = Student.query()
+                .preload('user')
+                .whereHas('user', (q) => q.where('role', Role.STUDENT))
+
+            if (email) {
+                query.whereHas('user', (q) => {
+                    q.where('email', 'ilike', `%${email}%`)
+                })
+            }
+
+            if (name) {
+                query.whereRaw("concat(first_name, ' ', name, ' ', last_name) ilike ?", [
+                    `%${name}%`,
+                ])
+            }
+
+            if (facultyCode) {
+                query.where('facultyCode', facultyCode)
+            }
+
+            const students = await query
+
+            return response.ok({
+                status: 'success',
+                message: 'Résultats de recherche des étudiants récupérés avec succès',
+                data: students,
+            })
+        } catch (error) {
+            console.error(error)
+            return response.internalServerError({
+                status: 'error',
+                message: 'Échec de la recherche des étudiants',
+            })
+        }
+    }
+
+    // -------------------------
+    // Rechercher des managers
+    // -------------------------
+    async searchManagers({ request, response }: HttpContext) {
+        try {
+            const { name, email } = request.qs()
+
+            const query = Admin.query()
+                .preload('user')
+                .whereHas('user', (q) => q.where('role', Role.MANAGER))
+
+            if (email) {
+                query.whereHas('user', (q) => {
+                    q.where('email', 'ilike', `%${email}%`)
+                })
+            }
+
+            if (name) {
+                query.whereRaw("concat(first_name, ' ', name) ilike ?", [`%${name}%`])
+            }
+
+            const managers = await query
+
+            return response.ok({
+                status: 'success',
+                message: 'Résultats de recherche des managers récupérés avec succès',
+                data: managers,
+            })
+        } catch (error) {
+            console.error(error)
+            return response.internalServerError({
+                status: 'error',
+                message: 'Échec de la recherche des managers',
+            })
         }
     }
 }
