@@ -3,8 +3,9 @@ import User from '#models/user'
 import Student from '#models/student'
 import Admin from '#models/admin'
 import { Role } from '../types/role/index.js'
-import crypto from 'node:crypto'
-import Mail from '@adonisjs/mail/services/main'
+import { Faculty } from '../types/faculty/faculty.js'
+//import crypto from 'node:crypto'
+//import Mail from '@adonisjs/mail/services/main'
 import { loginValidator } from '#validators/user'
 import { createStudentValidator, updateStudentValidator } from '#validators/student'
 import { createAdminValidator, updateAdminValidator } from '#validators/admin'
@@ -45,7 +46,7 @@ export default class UsersController {
         try {
             const admins = await Admin.query()
                 .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.ADMIN))
+                .whereHas('user', (q) => q.where('role', Role.MANAGER))
             return response.json({ data: admins })
         } catch (error) {
             console.error(error)
@@ -58,7 +59,7 @@ export default class UsersController {
             const admin = await Admin.query()
                 .where('id', params.id)
                 .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.ADMIN))
+                .whereHas('user', (q) => q.where('role', Role.MANAGER))
                 .first()
 
             if (!admin) return response.status(404).json({ message: 'Admin not found' })
@@ -77,27 +78,28 @@ export default class UsersController {
             const payload = await request.validateUsing(createStudentValidator)
             console.log(payload)
 
-            const verifyToken = crypto.randomBytes(32).toString('hex')
+            //const verifyToken = crypto.randomBytes(32).toString('hex')
 
-            /*const user = await User.create({
+            const user = await User.create({
                 email: payload.email,
                 password: payload.password,
                 role: Role.STUDENT,
-                isVerified: false,
+                isVerified: true, // à modifier en false
             })
 
             const student = await Student.create({
                 userId: user.id,
                 firstName: payload.firstName,
+                name: payload.name,
                 lastName: payload.lastName,
                 gender: payload.gender,
                 phoneNumber: payload.phoneNumber,
-                faculty: payload.faculty,
+                facultyCode: payload.faculty,
                 department: payload.department,
                 promotion: payload.promotion,
                 photoUrl: payload.photoUrl,
             })
-
+            /*
             const verifyUrl = `https://ton-domaine.com/users/verify/${verifyToken}`
             await Mail.send((message) => {
                 message
@@ -122,13 +124,14 @@ export default class UsersController {
 
     async createAdmin({ request, response }: HttpContext) {
         try {
+            console.log(request.all())
             const payload = await request.validateUsing(createAdminValidator)
-            const verifyToken = crypto.randomBytes(32).toString('hex')
+            //const verifyToken = crypto.randomBytes(32).toString('hex')
 
             const user = await User.create({
                 email: payload.email,
                 password: payload.password,
-                role: Role.ADMIN,
+                role: payload.role,
                 isVerified: false,
             })
 
@@ -138,14 +141,14 @@ export default class UsersController {
                 name: payload.name,
             })
 
-            const verifyUrl = `https://ton-domaine.com/users/verify/${verifyToken}`
+            /*const verifyUrl = `https://ton-domaine.com/users/verify/${verifyToken}`
             await Mail.send((message) => {
                 message
                     .to(user.email)
                     .from('no-reply@ton-domaine.com')
                     .subject('Validez votre compte')
                     .htmlView('emails/verify', { verifyUrl })
-            })
+            })*/
 
             return response.created({
                 status: 'success',
@@ -161,7 +164,7 @@ export default class UsersController {
     // -------------------------
     // UPDATE / DELETE
     // -------------------------
-    /*async updateStudent({ params, request, response }: HttpContext) {
+    async updateStudent({ params, request, response }: HttpContext) {
         try {
             const student = await Student.find(params.id)
             if (!student) return response.status(404).json({ message: 'Student not found' })
@@ -240,7 +243,7 @@ export default class UsersController {
     // -------------------------
     // Email verification
     // -------------------------
-    async verifyEmail({ params, response }: HttpContext) {
+    /*async verifyEmail({ params, response }: HttpContext) {
         try {
             const user = await User.findBy('verifyToken', params.token)
             if (!user) return response.status(400).json({ message: 'Lien invalide ou expiré' })
@@ -345,7 +348,7 @@ export default class UsersController {
                 .status(500)
                 .json({ message: 'Erreur lors du changement de mot de passe' })
         }
-    }
+    }*/
 
     // -------------------------
     // Login / Logout
@@ -354,14 +357,21 @@ export default class UsersController {
         try {
             const { email, password } = await request.validateUsing(loginValidator)
 
-            const token = await auth.use('api').attempt(email, password, {
-                expiresIn: '7days',
-            })
+            const userCurrent = await User.findBy('email', email)
+            if (!userCurrent || !userCurrent.isVerified) {
+                return response
+                    .status(401)
+                    .json({ status: 'error', message: 'Invalid credentials' })
+            }
+
+            const user = await User.verifyCredentials(email, password)
+            const token = await auth.use('api').createToken(user)
+            //const token = await User.accessTokens.create(user)
 
             return response.json({
                 status: 'success',
                 message: 'Logged in successfully',
-                data: { token, user: auth.user },
+                data: { token, user },
             })
         } catch (error) {
             console.error(error)
@@ -371,11 +381,11 @@ export default class UsersController {
 
     async logout({ auth, response }: HttpContext) {
         try {
-            await auth.use('api').revoke()
+            await auth.use('api').invalidateToken()
             return response.json({ status: 'success', message: 'Logged out successfully' })
         } catch (error) {
             console.error(error)
             return response.status(500).json({ status: 'error', message: 'Failed to logout' })
         }
-    }*/
+    }
 }

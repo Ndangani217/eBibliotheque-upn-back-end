@@ -1,4 +1,5 @@
 import vine from '@vinejs/vine'
+import { Role } from '../types/role/index.js'
 export const createAdminValidator = vine.compile(
     vine.object({
         email: vine.string().email().unique({ table: 'users', column: 'email' }),
@@ -9,6 +10,7 @@ export const createAdminValidator = vine.compile(
             .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/),
         firstName: vine.string().minLength(3),
         name: vine.string().minLength(3),
+        role: vine.enum(Object.values(Role)),
     }),
 )
 

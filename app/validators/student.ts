@@ -7,10 +7,14 @@ export const createStudentValidator = vine.compile(
     vine.object({
         email: vine.string().email().unique({ table: 'users', column: 'email' }),
         password: vine.string().minLength(6),
-        firstName: vine.string(),
-        lastName: vine.string(),
+        firstName: vine.string().minLength(3),
+        name: vine.string().minLength(3),
+        lastName: vine.string().minLength(3),
         gender: vine.enum(Object.values(Sexe)),
-        phoneNumber: vine.string().regex(/^(?:\+243|0)[1-9]\d{8}$/),
+        phoneNumber: vine
+            .string()
+            .regex(/^(?:\+243|0)[1-9]\d{8}$/)
+            .optional(),
         faculty: vine.enum(Object.values(Faculty)),
         department: vine.string(),
         promotion: vine.enum(Object.values(Promotion)),
@@ -20,15 +24,18 @@ export const createStudentValidator = vine.compile(
 
 export const updateStudentValidator = vine.compile(
     vine.object({
-        firstName: vine.string().minLength(2).optional(),
-        lastName: vine.string().minLength(2).optional(),
-        gender: vine.enum(Object.values(Sexe)),
+        email: vine.string().email().unique({ table: 'users', column: 'email' }).optional(),
+        password: vine.string().minLength(6).optional(),
+        firstName: vine.string().minLength(3).optional(),
+        name: vine.string().minLength(3),
+        lastName: vine.string().minLength(3),
+        gender: vine.enum(Object.values(Sexe)).optional(),
         phoneNumber: vine
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
         faculty: vine.enum(Object.values(Faculty)).optional(),
-        department: vine.string().minLength(2).optional(),
+        department: vine.string().optional(),
         promotion: vine.enum(Object.values(Promotion)).optional(),
         photoUrl: vine.string().url().optional(),
     }),
