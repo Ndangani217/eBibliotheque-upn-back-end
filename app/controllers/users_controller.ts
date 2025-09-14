@@ -368,6 +368,20 @@ export default class UsersController {
             const token = await auth.use('api').createToken(user)
             //const token = await User.accessTokens.create(user)
 
+            /*let abilities: number[] = []
+
+           switch (user.role) {
+                case Role.ADMIN:
+                    abilities = [3] // admin
+                    break
+                case Role.MANAGER:
+                    abilities = [2] // manager
+                    break
+                case Role.STUDENT:
+                    abilities = [1] // student
+                    break
+            }*/
+
             return response.json({
                 status: 'success',
                 message: 'Logged in successfully',
