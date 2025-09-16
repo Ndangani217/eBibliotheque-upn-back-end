@@ -6,7 +6,6 @@ import { Sexe } from '../types/sexe/index.js'
 export const createStudentValidator = vine.compile(
     vine.object({
         email: vine.string().email().unique({ table: 'users', column: 'email' }),
-        password: vine.string().minLength(6),
         firstName: vine.string().minLength(3),
         name: vine.string().minLength(3),
         lastName: vine.string().minLength(3),
@@ -25,7 +24,6 @@ export const createStudentValidator = vine.compile(
 export const updateStudentValidator = vine.compile(
     vine.object({
         email: vine.string().email().unique({ table: 'users', column: 'email' }).optional(),
-        password: vine.string().minLength(6).optional(),
         firstName: vine.string().minLength(3).optional(),
         name: vine.string().minLength(3),
         lastName: vine.string().minLength(3),

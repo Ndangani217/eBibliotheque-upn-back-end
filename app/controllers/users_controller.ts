@@ -5,7 +5,7 @@ import Admin from '#models/admin'
 import { Role } from '../types/role/index.js'
 //import crypto from 'node:crypto'
 //import Mail from '@adonisjs/mail/services/main'
-import { loginValidator } from '#validators/user'
+import { loginValidator, AddPasswordalidator } from '#validators/user'
 import { createStudentValidator, updateStudentValidator } from '#validators/student'
 import { createAdminValidator, updateAdminValidator } from '#validators/admin'
 
@@ -80,7 +80,6 @@ export default class UsersController {
 
             const user = await User.create({
                 email: payload.email,
-                password: payload.password,
                 role: Role.STUDENT,
                 isVerified: true, // à modifier en false
             })
@@ -128,7 +127,6 @@ export default class UsersController {
 
             const user = await User.create({
                 email: payload.email,
-                password: payload.password,
                 role: payload.role,
                 isVerified: false,
             })
@@ -156,6 +154,41 @@ export default class UsersController {
         } catch (error) {
             console.error(error)
             return response.status(500).json({ status: 'error', message: 'Failed to create admin' })
+        }
+    }
+
+    async addPassword({ params, request, response }: HttpContext) {
+        try {
+            const { password } = await request.validateUsing(AddPasswordalidator)
+            const user = await User.find(params.id)
+            if (!user) {
+                return response.notFound({
+                    status: 'error',
+                    message: 'User not found',
+                })
+            }
+
+            if (user.password) {
+                return response.badRequest({
+                    status: 'error',
+                    message: 'Password already set. Use changePassword instead.',
+                })
+            }
+
+            user.password = password
+            await user.save()
+
+            return response.ok({
+                status: 'success',
+                message: 'Password set successfully',
+                data: { id: user.id, email: user.email },
+            })
+        } catch (error) {
+            console.error(error)
+            return response.internalServerError({
+                status: 'error',
+                message: 'Failed to set password',
+            })
         }
     }
 

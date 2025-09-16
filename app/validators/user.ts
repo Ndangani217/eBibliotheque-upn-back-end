@@ -13,3 +13,13 @@ export const updateAdminValidator = vine.compile(
         name: vine.string().minLength(3).optional(),
     }),
 )
+
+export const AddPasswordalidator = vine.compile(
+    vine.object({
+        password: vine
+            .string()
+            .minLength(8)
+            .maxLength(32)
+            .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/),
+    }),
+)

@@ -58,6 +58,8 @@ router
         router
             .post('/admins', [UsersController, 'createAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
+        router.post('/users/:id/password', [UsersController, 'addPassword'])
         router
             .put('/admins/:id', [UsersController, 'updateAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
