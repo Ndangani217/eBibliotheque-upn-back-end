@@ -1,4 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import hash from '@adonisjs/core/services/hash'
 import User from '#models/user'
 import Student from '#models/student'
 import Admin from '#models/admin'
@@ -174,7 +175,7 @@ export default class UsersController {
                 })
             }
 
-            user.password = password
+            user.password = await hash.use('scrypt').make(password)
             user.isVerified = true
             await user.save()
 
