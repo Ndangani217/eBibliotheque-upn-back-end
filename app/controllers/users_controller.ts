@@ -81,7 +81,6 @@ export default class UsersController {
             const user = await User.create({
                 email: payload.email,
                 role: Role.STUDENT,
-                isVerified: true, // à modifier en false
             })
 
             const student = await Student.create({
@@ -176,6 +175,7 @@ export default class UsersController {
             }
 
             user.password = password
+            user.isVerified = true
             await user.save()
 
             return response.ok({
