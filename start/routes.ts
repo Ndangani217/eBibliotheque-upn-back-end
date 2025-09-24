@@ -21,71 +21,75 @@ import { middleware } from './kernel.js'
 const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
 import { Role } from '#types/role'
-
-// ------------------------
-// USERS / STUDENTS / ADMINS
-// ------------------------
-
 router
     .group(() => {
-        // USERS / STUDENTS / ADMINS
+        // STUDENTS
         router
             .get('/students', [UsersController, 'getStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
         router
             .get('/students/:id', [UsersController, 'getStudentById'])
             .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
         router.post('/students', [UsersController, 'createStudent'])
-
         router
             .put('/students/:id', [UsersController, 'updateStudent'])
             .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
-
         router
             .delete('/students/:id', [UsersController, 'deleteStudent'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-
         router
             .get('/students/search', [UsersController, 'searchStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
+        // -------------------------
+        // ADMINS
+        // -------------------------
         router
             .get('/admins', [UsersController, 'getAdmins'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
         router.get('/admins/:id', [UsersController, 'getAdminById'])
-
         router
             .post('/admins', [UsersController, 'createAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-
         router
             .put('/admins/:id', [UsersController, 'updateAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
         router
             .delete('/admins/:id', [UsersController, 'deleteAdmin'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+        router
+            .get('/admins/search', [UsersController, 'searchAdmins'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
+        // -------------------------
+        // MANAGERS
+        // -------------------------
+        router
+            .get('/managers', [UsersController, 'getManagers'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+        router.get('/managers/:id', [UsersController, 'getManagerById'])
+        router
+            .post('/managers', [UsersController, 'createManager'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+        router
+            .put('/managers/:id', [UsersController, 'updateManager'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+        router
+            .delete('/managers/:id', [UsersController, 'deleteManager'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
         router
             .get('/managers/search', [UsersController, 'searchManagers'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
-        /*// Email verification
-        router.get('/verify/:token', [UsersController, 'verifyEmail'])
-
-        // Forgot / Reset password
-        
-        router.get('/reset-password/:token', [UsersController, 'showResetForm'])
-        router.post('/reset-password/:token', [UsersController, 'resetPassword'])
-
-        // Change password pour utilisateur connecté
-        router
-            .post('/change-password', [UsersController, 'changePassword'])
-            .middleware([middleware.auth()])*/
-
-        // Auth
+        // -------------------------
+        // PASSWORD / AUTH
+        // -------------------------
         router.post('/:id/password', [UsersController, 'addPassword'])
         router.post('/forgot-password', [UsersController, 'forgotPassword'])
+
+        // -------------------------
+        // AUTH
+        // -------------------------
         router.get('/me', [UsersController, 'me']).middleware([middleware.auth()])
         router.post('/login', [UsersController, 'login'])
         router.post('/logout', [UsersController, 'logout']).middleware([middleware.auth()])

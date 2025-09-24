@@ -125,7 +125,7 @@ export const forgotPasswordValidator = vine.compile(
 
 export const resetPasswordValidator = vine.compile(
     vine.object({
-        newPassword: vine
+        password: vine
             .string()
             .minLength(8)
             .maxLength(32)

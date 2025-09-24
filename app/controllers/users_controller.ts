@@ -538,4 +538,34 @@ export default class UsersController {
             })
         }
     }
+    // -------------------------
+    // Réinitialiser mot de passe
+    // -------------------------
+    async resetPassword({ params, request, response }: HttpContext) {
+        try {
+            const { password } = await request.validateUsing(resetPasswordValidator)
+            const hashed = crypto.createHash('sha256').update(params.token).digest('hex')
+
+            const user = await User.query()
+                .where('reset_token', hashed)
+                .andWhere('reset_expires', '>', DateTime.utc().toSQL())
+                .first()
+
+            if (!user) {
+                return response.badRequest({ status: 'error', message: 'Lien invalide ou expiré' })
+            }
+
+            user.password = password
+            user.resetToken = null
+            user.resetExpires = null
+            await user.save()
+
+            return response.ok({
+                status: 'success',
+                message: 'Mot de passe réinitialisé avec succès',
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de réinitialiser le mot de passe')
+        }
+    }
 }
