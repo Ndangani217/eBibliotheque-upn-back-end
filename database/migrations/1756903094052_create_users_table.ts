@@ -13,7 +13,7 @@ export default class extends BaseSchema {
             table.string('name').notNullable()
             table.string('last_name').nullable()
             table.enum('gender', Object.values(Gender)).nullable()
-            table.string('phone_number').unique().notNullable()
+            table.string('phone_number').unique()
             table.string('faculty_code').nullable()
             table.string('department').nullable()
             table.enum('promotion', Object.values(Promotion)).nullable()

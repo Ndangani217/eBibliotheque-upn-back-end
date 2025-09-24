@@ -19,22 +19,22 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column({ isPrimary: true })
     declare id: number
 
-    @column()
+    @column({ columnName: 'first_name', serializeAs: 'firstName' })
     declare firstName: string
 
     @column()
     declare name: string
 
-    @column()
+    @column({ columnName: 'last_name', serializeAs: 'lastName' })
     declare lastName: string
 
     @column()
     declare gender: Gender
 
-    @column()
+    @column({ columnName: 'phone_number', serializeAs: 'phoneNumber' })
     declare phoneNumber: string
 
-    @column()
+    @column({ columnName: 'faculty_code', serializeAs: 'facultyCode' })
     declare facultyCode: string
 
     @belongsTo(() => Faculty, {
@@ -50,33 +50,33 @@ export default class User extends compose(BaseModel, AuthFinder) {
     declare promotion: Promotion
 
     @column()
-    declare photoUrl: string
-
-    @column()
     declare email: string
 
     @column()
     declare role: Role
 
-    @column()
-    declare isVerified: boolean
-
     @column({ serializeAs: null })
     declare password: string
 
-    @column({ serializeAs: null })
+    @column({ columnName: 'photo_url', serializeAs: 'photoUrl' })
+    declare photoUrl: string
+
+    @column({ columnName: 'is_verified', serializeAs: 'isVerified' })
+    declare isVerified: boolean
+
+    @column({ columnName: 'verify_token', serializeAs: null })
     declare verifyToken: string | null
 
-    @column({ serializeAs: null })
+    @column({ columnName: 'reset_token', serializeAs: null })
     declare resetToken: string | null
 
-    @column.dateTime({ serializeAs: null })
+    @column.dateTime({ columnName: 'reset_expires', serializeAs: null })
     declare resetExpires: DateTime | null
 
-    @column.dateTime({ autoCreate: true })
+    @column.dateTime({ columnName: 'created_at', autoCreate: true })
     declare createdAt: DateTime
 
-    @column.dateTime({ autoCreate: true, autoUpdate: true })
+    @column.dateTime({ columnName: 'updated_at', autoCreate: true, autoUpdate: true })
     declare updatedAt: DateTime | null
 
     static accessTokens = DbAccessTokensProvider.forModel(User, {

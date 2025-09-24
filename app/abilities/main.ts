@@ -14,7 +14,7 @@
 
 import { Bouncer } from '@adonisjs/bouncer'
 import User from '#models/user'
-import { Role } from '../types/role/index.js'
+import { Role } from '#types/role'
 
 /**
  * Delete the following ability to start from

@@ -56,7 +56,23 @@ export default class UsersController {
             return response.ok({
                 status: 'success',
                 message: 'Connexion réussie',
-                data: { token, user },
+                data: {
+                    token,
+                    user: {
+                        id: user.id,
+                        email: user?.email,
+                        role: user?.role,
+                        isVerified: user?.isVerified,
+                        firstName: user?.firstName,
+                        name: user?.name,
+                        lastName: user?.lastName,
+                        phoneNumber: user?.phoneNumber,
+                        facultyCode: user?.facultyCode,
+                        department: user?.department,
+                        promotion: user?.promotion,
+                        photoUrl: user?.photoUrl,
+                    },
+                },
             })
         } catch (error) {
             return handleError(response, error, 'Impossible de se connecter')
@@ -83,12 +99,17 @@ export default class UsersController {
                 data: {
                     user: {
                         id: auth.user.id,
-                        email: auth.user.email,
-                        role: auth.user.role,
-                        isVerified: auth.user.isVerified,
-                        firstName: auth.user.firstName,
-                        name: auth.user.name,
-                        lastName: auth.user.lastName,
+                        email: auth.user?.email,
+                        role: auth.user?.role,
+                        isVerified: auth.user?.isVerified,
+                        firstName: auth.user?.firstName,
+                        name: auth.user?.name,
+                        lastName: auth.user?.lastName,
+                        phoneNumber: auth.user?.phoneNumber,
+                        facultyCode: auth.user?.facultyCode,
+                        department: auth.user?.department,
+                        promotion: auth.user?.promotion,
+                        photoUrl: auth.user?.photoUrl,
                     },
                 },
             })
@@ -115,17 +136,17 @@ export default class UsersController {
     }
     async getManagerById({ params, response }: HttpContext) {
         try {
-            const student = await User.query()
+            const manager = await User.query()
                 .where('id', params.id)
                 .andWhere('role', Role.MANAGER)
                 .andWhere('is_verified', true)
                 .first()
 
-            if (!student) {
+            if (!manager) {
                 return response.notFound({ status: 'error', message: 'Manager introuvable' })
             }
 
-            return response.ok({ status: 'success', data: student })
+            return response.ok({ status: 'success', data: manager })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer le manager')
         }
@@ -194,6 +215,7 @@ export default class UsersController {
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
+            console.log(payload)
 
             const user = await User.create({
                 ...payload,
@@ -257,7 +279,6 @@ export default class UsersController {
     async addPassword({ params, request, response }: HttpContext) {
         try {
             const { password } = await request.validateUsing(AddPasswordValidator)
-
             const user = await User.find(params.id)
             if (!user)
                 return response.notFound({ status: 'error', message: 'Utilisateur introuvable' })
