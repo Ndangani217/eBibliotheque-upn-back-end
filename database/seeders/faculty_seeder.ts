@@ -3,6 +3,7 @@ import Faculty from '#models/faculty'
 
 export default class extends BaseSeeder {
     async run() {
+        //await Faculty.truncate(true)
         // Write your database queries inside the run method
         await Faculty.createMany([
             { code: 'SSAP', name: 'Sciences Sociales, Administratives et Politiques' },

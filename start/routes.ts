@@ -86,6 +86,7 @@ router
             .middleware([middleware.auth()])*/
 
         // Auth
+        router.get('/me', [UsersController, 'me']).middleware([middleware.auth()])
         router.post('/login', [UsersController, 'login'])
         router.post('/logout', [UsersController, 'logout']).middleware([middleware.auth()])
     })

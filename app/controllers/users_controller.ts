@@ -6,7 +6,7 @@ import Admin from '#models/admin'
 import { Role } from '../types/role/index.js'
 //import crypto from 'node:crypto'
 //import Mail from '@adonisjs/mail/services/main'
-import { loginValidator, AddPasswordalidator } from '#validators/user'
+import { loginValidator, AddPasswordValidator } from '#validators/user'
 import { createStudentValidator, updateStudentValidator } from '#validators/student'
 import { createAdminValidator, updateAdminValidator } from '#validators/admin'
 
@@ -73,11 +73,10 @@ export default class UsersController {
     // -------------------------
     // CREATE Student / Admin
     // -------------------------
+
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
-
-            //const verifyToken = crypto.randomBytes(32).toString('hex')
 
             const user = await User.create({
                 email: payload.email,
@@ -96,6 +95,7 @@ export default class UsersController {
                 promotion: payload.promotion,
                 photoUrl: payload.photoUrl,
             })
+
             /*
             const verifyUrl = `https://ton-domaine.com/users/verify/${verifyToken}`
             await Mail.send((message) => {
@@ -108,14 +108,23 @@ export default class UsersController {
 
             return response.created({
                 status: 'success',
-                message: 'Student created successfully. Check email to verify.',
+                message: 'Student created successfully',
                 data: { user, student },
             })
         } catch (error) {
             console.error(error)
-            return response
-                .status(500)
-                .json({ status: 'error', message: 'Failed to create student' })
+            if (error.messages) {
+                return response.status(422).json({
+                    status: 'error',
+                    message: 'Validation error',
+                    errors: error.messages,
+                })
+            }
+
+            return response.status(500).json({
+                status: 'error',
+                message: 'Failed to create student',
+            })
         }
     }
 
@@ -159,7 +168,8 @@ export default class UsersController {
 
     async addPassword({ params, request, response }: HttpContext) {
         try {
-            const { password } = await request.validateUsing(AddPasswordalidator)
+            const { password } = await request.validateUsing(AddPasswordValidator)
+
             const user = await User.find(params.id)
             if (!user) {
                 return response.notFound({
@@ -175,7 +185,7 @@ export default class UsersController {
                 })
             }
 
-            user.password = await hash.use('scrypt').make(password)
+            user.password = password
             user.isVerified = true
             await user.save()
 
@@ -186,9 +196,18 @@ export default class UsersController {
             })
         } catch (error) {
             console.error(error)
+
+            if (error.messages) {
+                return response.status(422).json({
+                    status: 'error',
+                    message: 'Validation error',
+                    errors: error.messages,
+                })
+            }
+
             return response.internalServerError({
                 status: 'error',
-                message: 'Failed to set password',
+                message: error.message || 'Failed to set password',
             })
         }
     }
@@ -289,30 +308,30 @@ export default class UsersController {
             console.error(error)
             return response.status(500).json({ message: 'Erreur lors de la vérification' })
         }
-    }
+    }*/
 
     // -------------------------
     // Forgot password / Reset password
     // -------------------------
-    async forgotPassword({ request, response }: HttpContext) {
+    /*async forgotPassword({ request, response }: HttpContext) {
         try {
             const { email } = request.only(['email'])
             const user = await User.findBy('email', email)
             if (!user) return response.status(404).json({ message: 'Utilisateur non trouvé' })
 
-            const resetToken = crypto.randomBytes(32).toString('hex')
-            user.resetToken = resetToken
-            user.resetExpires = new Date(Date.now() + 60 * 60 * 1000)
+            //const resetToken = crypto.randomBytes(32).toString('hex')
+            //user.resetToken = resetToken
+            //user.resetExpires = new Date(Date.now() + 60 * 60 * 1000)
             await user.save()
 
             const resetUrl = `https://ton-domaine.com/users/reset-password/${resetToken}`
-            await Mail.send((message) => {
-                message
-                    .to(user.email)
-                    .from('no-reply@ton-domaine.com')
-                    .subject('Réinitialisation de votre mot de passe')
-                    .htmlView('emails/reset-password', { resetUrl })
-            })
+           // await Mail.send((message) => {
+            //    message
+            //        .to(user.email)
+            //        .from('no-reply@ton-domaine.com')
+            //        .subject('Réinitialisation de votre mot de passe')
+            //        .htmlView('emails/reset-password', { resetUrl })
+            //})
 
             return response.json({ message: 'Email de réinitialisation envoyé' })
         } catch (error) {
@@ -320,7 +339,7 @@ export default class UsersController {
             return response.status(500).json({ message: 'Erreur lors de la réinitialisation' })
         }
     }
-
+    /*
     async showResetForm({ params, response }: HttpContext) {
         try {
             const user = await User.findBy('resetToken', params.token)
@@ -383,7 +402,7 @@ export default class UsersController {
     }*/
 
     // -------------------------
-    // Login / Logout
+    // Login
     // -------------------------
     async login({ request, auth, response }: HttpContext) {
         try {
@@ -395,10 +414,11 @@ export default class UsersController {
                     .status(401)
                     .json({ status: 'error', message: 'Invalid credentials' })
             }
+            //console.log(userCurrent)
 
             const user = await User.verifyCredentials(email, password)
             const token = await auth.use('api').createToken(user)
-            //const token = await User.accessTokens.create(user)
+            //const token = await User.accessTokens.create(user)*/
 
             /*let abilities: number[] = []
 
@@ -425,6 +445,9 @@ export default class UsersController {
         }
     }
 
+    // -------------------------
+    // Logout
+    // -------------------------
     async logout({ auth, response }: HttpContext) {
         try {
             await auth.use('api').invalidateToken()
@@ -456,13 +479,10 @@ export default class UsersController {
                     `%${name}%`,
                 ])
             }
-
             if (facultyCode) {
                 query.where('facultyCode', facultyCode)
             }
-
             const students = await query
-
             return response.ok({
                 status: 'success',
                 message: 'Résultats de recherche des étudiants récupérés avec succès',
@@ -473,6 +493,31 @@ export default class UsersController {
             return response.internalServerError({
                 status: 'error',
                 message: 'Échec de la recherche des étudiants',
+            })
+        }
+    }
+
+    async me({ auth, response }: HttpContext) {
+        try {
+            const user = auth.user
+            if (!user) {
+                return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+            }
+
+            return response.ok({
+                status: 'success',
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role,
+                    isVerified: user.isVerified,
+                },
+            })
+        } catch (error) {
+            console.error(error)
+            return response.internalServerError({
+                status: 'error',
+                message: 'Erreur lors de la récupération du profil',
             })
         }
     }
