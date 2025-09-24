@@ -20,7 +20,7 @@ import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
-import { Role } from '../app/types/role/index.js'
+import { Role } from '#types/role'
 
 // ------------------------
 // USERS / STUDENTS / ADMINS
@@ -59,8 +59,6 @@ router
             .post('/admins', [UsersController, 'createAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
-        router.post('/:id/password', [UsersController, 'addPassword'])
-
         router
             .put('/admins/:id', [UsersController, 'updateAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
@@ -71,12 +69,12 @@ router
         router
             .get('/managers/search', [UsersController, 'searchManagers'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-        /*
-        // Email verification
+
+        /*// Email verification
         router.get('/verify/:token', [UsersController, 'verifyEmail'])
 
         // Forgot / Reset password
-        router.post('/forgot-password', [UsersController, 'forgotPassword'])
+        
         router.get('/reset-password/:token', [UsersController, 'showResetForm'])
         router.post('/reset-password/:token', [UsersController, 'resetPassword'])
 
@@ -86,6 +84,8 @@ router
             .middleware([middleware.auth()])*/
 
         // Auth
+        router.post('/:id/password', [UsersController, 'addPassword'])
+        router.post('/forgot-password', [UsersController, 'forgotPassword'])
         router.get('/me', [UsersController, 'me']).middleware([middleware.auth()])
         router.post('/login', [UsersController, 'login'])
         router.post('/logout', [UsersController, 'logout']).middleware([middleware.auth()])

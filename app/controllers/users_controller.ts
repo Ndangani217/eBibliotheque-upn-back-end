@@ -1,188 +1,269 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import hash from '@adonisjs/core/services/hash'
 import User from '#models/user'
-import Student from '#models/student'
-import Admin from '#models/admin'
-import { Role } from '../types/role/index.js'
-//import crypto from 'node:crypto'
-//import Mail from '@adonisjs/mail/services/main'
-import { loginValidator, AddPasswordValidator } from '#validators/user'
-import { createStudentValidator, updateStudentValidator } from '#validators/student'
-import { createAdminValidator, updateAdminValidator } from '#validators/admin'
+import { Role } from '#types/role'
+import crypto from 'node:crypto'
+import hash from '@adonisjs/core/services/hash'
+import { DateTime } from 'luxon'
+import {
+    loginValidator,
+    AddPasswordValidator,
+    createStudentValidator,
+    updateStudentValidator,
+    createManagerValidator,
+    updateAdminValidator,
+    forgotPasswordValidator,
+    resetPasswordValidator,
+    changePasswordValidator,
+} from '#validators/user'
+
+// -------------------------
+// Helper centralisé pour erreurs
+// -------------------------
+function handleError(response: HttpContext['response'], error: any, defaultMessage: string) {
+    console.error(error)
+
+    // Erreurs de validation Vine
+    if (error.messages) {
+        return response.unprocessableEntity({
+            status: 'error',
+            message: 'Erreur de validation',
+            errors: error.messages,
+        })
+    }
+
+    return response.internalServerError({
+        status: 'error',
+        message: error.message || defaultMessage,
+    })
+}
 
 export default class UsersController {
     // -------------------------
-    // GET Students / Admins
+    // AUTH
     // -------------------------
-    async getStudents({ response }: HttpContext) {
+    async login({ request, auth, response }: HttpContext) {
         try {
-            const students = await Student.query()
-                .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.STUDENT))
-            return response.json({ data: students })
+            const { email, password } = await request.validateUsing(loginValidator)
+
+            const userCurrent = await User.findBy('email', email)
+            if (!userCurrent || !userCurrent.isVerified) {
+                return response.unauthorized({ status: 'error', message: 'Identifiants invalides' })
+            }
+
+            const user = await User.verifyCredentials(email, password)
+            const token = await auth.use('api').createToken(user)
+
+            return response.ok({
+                status: 'success',
+                message: 'Connexion réussie',
+                data: { token, user },
+            })
         } catch (error) {
-            console.error(error)
-            return response.status(500).json({ error: 'Failed to get students' })
+            return handleError(response, error, 'Impossible de se connecter')
         }
     }
 
+    async logout({ auth, response }: HttpContext) {
+        try {
+            await auth.use('api').invalidateToken()
+            return response.ok({ status: 'success', message: 'Déconnexion réussie' })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de se déconnecter')
+        }
+    }
+
+    async me({ auth, response }: HttpContext) {
+        try {
+            if (!auth.user) {
+                return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+            }
+
+            return response.ok({
+                status: 'success',
+                data: {
+                    user: {
+                        id: auth.user.id,
+                        email: auth.user.email,
+                        role: auth.user.role,
+                        isVerified: auth.user.isVerified,
+                        firstName: auth.user.firstName,
+                        name: auth.user.name,
+                        lastName: auth.user.lastName,
+                    },
+                },
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de récupérer le profil')
+        }
+    }
     async getStudentById({ params, response }: HttpContext) {
         try {
-            const student = await Student.query()
+            const student = await User.query()
                 .where('id', params.id)
-                .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.STUDENT))
+                .andWhere('role', Role.STUDENT)
+                .andWhere('is_verified', true)
                 .first()
 
-            if (!student) return response.status(404).json({ message: 'Student not found' })
-            return response.json({ status: 'success', message: 'Student details', data: student })
+            if (!student) {
+                return response.notFound({ status: 'error', message: 'Étudiant introuvable' })
+            }
+
+            return response.ok({ status: 'success', data: student })
         } catch (error) {
-            console.error(error)
-            return response.status(500).json({ error: 'Failed to get student' })
+            return handleError(response, error, 'Impossible de récupérer l’étudiant')
         }
     }
-
-    async getAdmins({ response }: HttpContext) {
+    async getManagerById({ params, response }: HttpContext) {
         try {
-            const admins = await Admin.query()
-                .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.MANAGER))
-            return response.json({ data: admins })
+            const student = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.MANAGER)
+                .andWhere('is_verified', true)
+                .first()
+
+            if (!student) {
+                return response.notFound({ status: 'error', message: 'Manager introuvable' })
+            }
+
+            return response.ok({ status: 'success', data: student })
         } catch (error) {
-            console.error(error)
-            return response.status(500).json({ error: 'Failed to get admins' })
+            return handleError(response, error, 'Impossible de récupérer le manager')
         }
     }
 
     async getAdminById({ params, response }: HttpContext) {
         try {
-            const admin = await Admin.query()
+            const admin = await User.query()
                 .where('id', params.id)
-                .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.MANAGER))
+                .andWhere('role', Role.ADMIN)
+                .andWhere('is_verified', true)
                 .first()
 
-            if (!admin) return response.status(404).json({ message: 'Admin not found' })
-            return response.created({ status: 'success', message: 'Admin details', data: admin })
+            if (!admin) {
+                return response.notFound({ status: 'error', message: 'Admin introuvable' })
+            }
+
+            return response.ok({ status: 'success', data: admin })
         } catch (error) {
-            console.error(error)
-            return response.status(500).json({ error: 'Failed to get admin' })
+            return handleError(response, error, 'Impossible de récupérer l’admin')
         }
     }
 
     // -------------------------
-    // CREATE Student / Admin
+    // GET USERS
     // -------------------------
+    async getStudents({ response }: HttpContext) {
+        try {
+            const students = await User.query()
+                .where('role', Role.STUDENT)
+                .andWhere('is_verified', true)
 
+            return response.ok({ status: 'success', data: students })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de récupérer les étudiants')
+        }
+    }
+
+    async getManagers({ response }: HttpContext) {
+        try {
+            const managers = await User.query()
+                .where('role', Role.MANAGER)
+                .andWhere('is_verified', true)
+
+            return response.ok({ status: 'success', data: managers })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de récupérer les managers')
+        }
+    }
+
+    async getAdmins({ response }: HttpContext) {
+        try {
+            const admins = await User.query()
+                .where('role', Role.ADMIN)
+                .andWhere('is_verified', true)
+
+            return response.ok({ status: 'success', data: admins })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de récupérer les admins')
+        }
+    }
+
+    // -------------------------
+    // CREATE USERS
+    // -------------------------
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
 
             const user = await User.create({
-                email: payload.email,
+                ...payload,
                 role: Role.STUDENT,
+                isVerified: false,
             })
-
-            const student = await Student.create({
-                userId: user.id,
-                firstName: payload.firstName,
-                name: payload.name,
-                lastName: payload.lastName,
-                gender: payload.gender,
-                phoneNumber: payload.phoneNumber,
-                facultyCode: payload.faculty,
-                department: payload.department,
-                promotion: payload.promotion,
-                photoUrl: payload.photoUrl,
-            })
-
-            /*
-            const verifyUrl = `https://ton-domaine.com/users/verify/${verifyToken}`
-            await Mail.send((message) => {
-                message
-                    .to(user.email)
-                    .from('no-reply@ton-domaine.com')
-                    .subject('Validez votre compte')
-                    .htmlView('emails/verify', { verifyUrl })
-            })*/
 
             return response.created({
                 status: 'success',
-                message: 'Student created successfully',
-                data: { user, student },
+                message: 'Étudiant créé avec succès',
+                data: user,
             })
         } catch (error) {
-            console.error(error)
-            if (error.messages) {
-                return response.status(422).json({
-                    status: 'error',
-                    message: 'Validation error',
-                    errors: error.messages,
-                })
-            }
+            return handleError(response, error, 'Impossible de créer l’étudiant')
+        }
+    }
 
-            return response.status(500).json({
-                status: 'error',
-                message: 'Failed to create student',
+    async createManager({ request, response }: HttpContext) {
+        try {
+            const payload = await request.validateUsing(createManagerValidator)
+
+            const user = await User.create({
+                ...payload,
+                role: Role.MANAGER,
+                isVerified: false,
             })
+
+            return response.created({
+                status: 'success',
+                message: 'Manager créé avec succès',
+                data: user,
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de créer le manager')
         }
     }
 
     async createAdmin({ request, response }: HttpContext) {
         try {
-            console.log(request.all())
-            const payload = await request.validateUsing(createAdminValidator)
-            //const verifyToken = crypto.randomBytes(32).toString('hex')
+            const payload = await request.validateUsing(updateAdminValidator)
 
             const user = await User.create({
-                email: payload.email,
-                role: payload.role,
+                ...payload,
+                role: Role.ADMIN,
                 isVerified: false,
             })
 
-            const admin = await Admin.create({
-                userId: user.id,
-                firstName: payload.firstName,
-                name: payload.name,
-            })
-
-            /*const verifyUrl = `https://ton-domaine.com/users/verify/${verifyToken}`
-            await Mail.send((message) => {
-                message
-                    .to(user.email)
-                    .from('no-reply@ton-domaine.com')
-                    .subject('Validez votre compte')
-                    .htmlView('emails/verify', { verifyUrl })
-            })*/
-
             return response.created({
                 status: 'success',
-                message: 'Admin created successfully. Check email to verify.',
-                data: { user, admin },
+                message: 'Admin créé avec succès',
+                data: user,
             })
         } catch (error) {
-            console.error(error)
-            return response.status(500).json({ status: 'error', message: 'Failed to create admin' })
+            return handleError(response, error, 'Impossible de créer l’admin')
         }
     }
 
+    // -------------------------
+    // ADD PASSWORD
+    // -------------------------
     async addPassword({ params, request, response }: HttpContext) {
         try {
             const { password } = await request.validateUsing(AddPasswordValidator)
 
             const user = await User.find(params.id)
-            if (!user) {
-                return response.notFound({
-                    status: 'error',
-                    message: 'User not found',
-                })
-            }
+            if (!user)
+                return response.notFound({ status: 'error', message: 'Utilisateur introuvable' })
 
             if (user.password) {
-                return response.badRequest({
-                    status: 'error',
-                    message: 'Password already set. Use changePassword instead.',
-                })
+                return response.badRequest({ status: 'error', message: 'Mot de passe déjà défini' })
             }
 
             user.password = password
@@ -191,370 +272,269 @@ export default class UsersController {
 
             return response.ok({
                 status: 'success',
-                message: 'Password set successfully',
+                message: 'Mot de passe défini avec succès',
                 data: { id: user.id, email: user.email },
             })
         } catch (error) {
-            console.error(error)
-
-            if (error.messages) {
-                return response.status(422).json({
-                    status: 'error',
-                    message: 'Validation error',
-                    errors: error.messages,
-                })
-            }
-
-            return response.internalServerError({
-                status: 'error',
-                message: error.message || 'Failed to set password',
-            })
+            return handleError(response, error, 'Impossible de définir le mot de passe')
         }
     }
 
     // -------------------------
-    // UPDATE / DELETE
+    // UPDATE USERS
     // -------------------------
     async updateStudent({ params, request, response }: HttpContext) {
         try {
-            const student = await Student.find(params.id)
-            if (!student) return response.status(404).json({ message: 'Student not found' })
+            const user = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.STUDENT)
+                .first()
+
+            if (!user)
+                return response.notFound({ status: 'error', message: 'Étudiant introuvable' })
 
             const payload = await request.validateUsing(updateStudentValidator)
-            student.merge(payload)
-            await student.save()
+            user.merge(payload)
+            await user.save()
 
-            return response.json({
+            return response.ok({
                 status: 'success',
-                message: 'Student updated successfully',
-                data: student,
+                message: 'Étudiant mis à jour avec succès',
+                data: user,
             })
         } catch (error) {
-            console.error(error)
-            return response
-                .status(500)
-                .json({ status: 'error', message: 'Failed to update student' })
+            return handleError(response, error, 'Impossible de mettre à jour l’étudiant')
+        }
+    }
+
+    async updateManager({ params, request, response }: HttpContext) {
+        try {
+            const user = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.MANAGER)
+                .first()
+
+            if (!user) return response.notFound({ status: 'error', message: 'Manager introuvable' })
+
+            const payload = await request.validateUsing(updateAdminValidator)
+            user.merge(payload)
+            await user.save()
+
+            return response.ok({
+                status: 'success',
+                message: 'Manager mis à jour avec succès',
+                data: user,
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de mettre à jour le manager')
         }
     }
 
     async updateAdmin({ params, request, response }: HttpContext) {
         try {
-            const admin = await Admin.find(params.id)
-            if (!admin) return response.status(404).json({ message: 'Admin not found' })
+            const user = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.ADMIN)
+                .first()
+
+            if (!user) return response.notFound({ status: 'error', message: 'Admin introuvable' })
 
             const payload = await request.validateUsing(updateAdminValidator)
-            admin.merge(payload)
-            await admin.save()
+            user.merge(payload)
+            await user.save()
 
-            return response.json({
+            return response.ok({
                 status: 'success',
-                message: 'Admin updated successfully',
-                data: admin,
+                message: 'Admin mis à jour avec succès',
+                data: user,
             })
         } catch (error) {
-            console.error(error)
-            return response.status(500).json({ status: 'error', message: 'Failed to update admin' })
-        }
-    }
-
-    async deleteStudent({ params, response }: HttpContext) {
-        try {
-            const student = await Student.find(params.id)
-            if (!student) return response.status(404).json({ message: 'Student not found' })
-
-            const user = await User.find(student.userId)
-            await student.delete()
-            if (user) await user.delete()
-
-            return response.json({ status: 'success', message: 'Student deleted successfully' })
-        } catch (error) {
-            console.error(error)
-            return response
-                .status(500)
-                .json({ status: 'error', message: 'Failed to delete student' })
-        }
-    }
-
-    async deleteAdmin({ params, response }: HttpContext) {
-        try {
-            const admin = await Admin.find(params.id)
-            if (!admin) return response.status(404).json({ message: 'Admin not found' })
-
-            const user = await User.find(admin.userId)
-            await admin.delete()
-            if (user) await user.delete()
-
-            return response.json({ status: 'success', message: 'Admin deleted successfully' })
-        } catch (error) {
-            console.error(error)
-            return response.status(500).json({ status: 'error', message: 'Failed to delete admin' })
+            return handleError(response, error, 'Impossible de mettre à jour l’admin')
         }
     }
 
     // -------------------------
-    // Email verification
-    // -------------------------
-    /*async verifyEmail({ params, response }: HttpContext) {
-        try {
-            const user = await User.findBy('verifyToken', params.token)
-            if (!user) return response.status(400).json({ message: 'Lien invalide ou expiré' })
-
-            user.isVerified = true
-            user.verifyToken = null
-            await user.save()
-
-            return response.json({ message: 'Compte vérifié avec succès !' })
-        } catch (error) {
-            console.error(error)
-            return response.status(500).json({ message: 'Erreur lors de la vérification' })
-        }
-    }*/
-
-    // -------------------------
-    // Forgot password / Reset password
-    // -------------------------
-    /*async forgotPassword({ request, response }: HttpContext) {
-        try {
-            const { email } = request.only(['email'])
-            const user = await User.findBy('email', email)
-            if (!user) return response.status(404).json({ message: 'Utilisateur non trouvé' })
-
-            //const resetToken = crypto.randomBytes(32).toString('hex')
-            //user.resetToken = resetToken
-            //user.resetExpires = new Date(Date.now() + 60 * 60 * 1000)
-            await user.save()
-
-            const resetUrl = `https://ton-domaine.com/users/reset-password/${resetToken}`
-           // await Mail.send((message) => {
-            //    message
-            //        .to(user.email)
-            //        .from('no-reply@ton-domaine.com')
-            //        .subject('Réinitialisation de votre mot de passe')
-            //        .htmlView('emails/reset-password', { resetUrl })
-            //})
-
-            return response.json({ message: 'Email de réinitialisation envoyé' })
-        } catch (error) {
-            console.error(error)
-            return response.status(500).json({ message: 'Erreur lors de la réinitialisation' })
-        }
-    }
-    /*
-    async showResetForm({ params, response }: HttpContext) {
-        try {
-            const user = await User.findBy('resetToken', params.token)
-            if (!user || !user.resetExpires || new Date() > new Date(user.resetExpires)) {
-                return response.status(400).json({ message: 'Lien invalide ou expiré' })
-            }
-            return response.json({
-                message: 'Token valide, vous pouvez réinitialiser le mot de passe',
-            })
-        } catch (error) {
-            console.error(error)
-            return response.status(500).json({ message: 'Erreur lors de la vérification du token' })
-        }
-    }
-
-    async resetPassword({ params, request, response }: HttpContext) {
-        try {
-            const { newPassword } = request.only(['newPassword'])
-            const user = await User.findBy('resetToken', params.token)
-            if (!user || !user.resetExpires || new Date() > new Date(user.resetExpires)) {
-                return response.status(400).json({ message: 'Lien invalide ou expiré' })
-            }
-
-            user.password = newPassword
-            user.resetToken = null
-            user.resetExpires = null
-            await user.save()
-
-            return response.json({ message: 'Mot de passe réinitialisé avec succès' })
-        } catch (error) {
-            console.error(error)
-            return response
-                .status(500)
-                .json({ message: 'Erreur lors de la réinitialisation du mot de passe' })
-        }
-    }
-
-    async changePassword({ request, auth, response }: HttpContext) {
-        try {
-            const { currentPassword, newPassword } = request.only([
-                'currentPassword',
-                'newPassword',
-            ])
-            const user = auth.user as User
-
-            if (!(await user.verifyPassword(currentPassword))) {
-                return response.status(400).json({ message: 'Mot de passe actuel incorrect' })
-            }
-
-            user.password = newPassword
-            await user.save()
-
-            return response.json({ message: 'Mot de passe changé avec succès' })
-        } catch (error) {
-            console.error(error)
-            return response
-                .status(500)
-                .json({ message: 'Erreur lors du changement de mot de passe' })
-        }
-    }*/
-
-    // -------------------------
-    // Login
-    // -------------------------
-    async login({ request, auth, response }: HttpContext) {
-        try {
-            const { email, password } = await request.validateUsing(loginValidator)
-
-            const userCurrent = await User.findBy('email', email)
-            if (!userCurrent || !userCurrent.isVerified) {
-                return response
-                    .status(401)
-                    .json({ status: 'error', message: 'Invalid credentials' })
-            }
-            //console.log(userCurrent)
-
-            const user = await User.verifyCredentials(email, password)
-            const token = await auth.use('api').createToken(user)
-            //const token = await User.accessTokens.create(user)*/
-
-            /*let abilities: number[] = []
-
-           switch (user.role) {
-                case Role.ADMIN:
-                    abilities = [3] // admin
-                    break
-                case Role.MANAGER:
-                    abilities = [2] // manager
-                    break
-                case Role.STUDENT:
-                    abilities = [1] // student
-                    break
-            }*/
-
-            return response.json({
-                status: 'success',
-                message: 'Logged in successfully',
-                data: { token, user },
-            })
-        } catch (error) {
-            console.error(error)
-            return response.status(401).json({ status: 'error', message: 'Invalid credentials' })
-        }
-    }
-
-    // -------------------------
-    // Logout
-    // -------------------------
-    async logout({ auth, response }: HttpContext) {
-        try {
-            await auth.use('api').invalidateToken()
-            return response.json({ status: 'success', message: 'Logged out successfully' })
-        } catch (error) {
-            console.error(error)
-            return response.status(500).json({ status: 'error', message: 'Failed to logout' })
-        }
-    }
-    // -------------------------
-    // Rechercher des étudiants
+    // SEARCH USERS
     // -------------------------
     async searchStudents({ request, response }: HttpContext) {
         try {
             const { name, email, facultyCode } = request.qs()
 
-            const query = Student.query()
-                .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.STUDENT))
+            const query = User.query().where('role', Role.STUDENT).andWhere('is_verified', true)
 
-            if (email) {
-                query.whereHas('user', (q) => {
-                    q.where('email', 'ilike', `%${email}%`)
-                })
-            }
-
+            if (email) query.whereILike('email', `%${email}%`)
             if (name) {
-                query.whereRaw("concat(first_name, ' ', name, ' ', last_name) ilike ?", [
+                query.whereRaw("concat(first_name, ' ', name, ' ', last_name) ILIKE ?", [
                     `%${name}%`,
                 ])
             }
-            if (facultyCode) {
-                query.where('facultyCode', facultyCode)
-            }
+            if (facultyCode) query.where('faculty_code', facultyCode)
+
             const students = await query
+
             return response.ok({
                 status: 'success',
-                message: 'Résultats de recherche des étudiants récupérés avec succès',
+                message: 'Résultats de recherche des étudiants récupérés',
                 data: students,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Échec de la recherche des étudiants',
-            })
+            return handleError(response, error, 'Erreur lors de la recherche des étudiants')
         }
     }
 
-    async me({ auth, response }: HttpContext) {
-        try {
-            const user = auth.user
-            if (!user) {
-                return response.unauthorized({ status: 'error', message: 'Non authentifié' })
-            }
-
-            return response.ok({
-                status: 'success',
-                user: {
-                    id: user.id,
-                    email: user.email,
-                    role: user.role,
-                    isVerified: user.isVerified,
-                },
-            })
-        } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Erreur lors de la récupération du profil',
-            })
-        }
-    }
-
-    // -------------------------
-    // Rechercher des managers
-    // -------------------------
     async searchManagers({ request, response }: HttpContext) {
         try {
             const { name, email } = request.qs()
 
-            const query = Admin.query()
-                .preload('user')
-                .whereHas('user', (q) => q.where('role', Role.MANAGER))
+            const query = User.query().where('role', Role.MANAGER).andWhere('is_verified', true)
 
-            if (email) {
-                query.whereHas('user', (q) => {
-                    q.where('email', 'ilike', `%${email}%`)
-                })
-            }
-
+            if (email) query.whereILike('email', `%${email}%`)
             if (name) {
-                query.whereRaw("concat(first_name, ' ', name) ilike ?", [`%${name}%`])
+                query.whereRaw("concat(first_name, ' ', name, ' ', last_name) ILIKE ?", [
+                    `%${name}%`,
+                ])
             }
 
             const managers = await query
 
             return response.ok({
                 status: 'success',
-                message: 'Résultats de recherche des managers récupérés avec succès',
+                message: 'Résultats de recherche des managers récupérés',
                 data: managers,
+            })
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors de la recherche des managers')
+        }
+    }
+
+    async searchAdmins({ request, response }: HttpContext) {
+        try {
+            const { name, email } = request.qs()
+
+            const query = User.query().where('role', Role.ADMIN).andWhere('is_verified', true)
+
+            if (email) query.whereILike('email', `%${email}%`)
+            if (name) {
+                query.whereRaw("concat(first_name, ' ', name, ' ', last_name) ILIKE ?", [
+                    `%${name}%`,
+                ])
+            }
+
+            const admins = await query
+
+            return response.ok({
+                status: 'success',
+                message: 'Résultats de recherche des admins récupérés',
+                data: admins,
+            })
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors de la recherche des admins')
+        }
+    }
+
+    // -------------------------
+    // DELETE USER
+    // -------------------------
+
+    async deleteStudent({ params, response }: HttpContext) {
+        try {
+            const student = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.STUDENT)
+                .first()
+
+            if (!student) {
+                return response.notFound({ status: 'error', message: 'Étudiant introuvable' })
+            }
+
+            await student.delete()
+            return response.ok({ status: 'success', message: 'Étudiant supprimé avec succès' })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de supprimer l’étudiant')
+        }
+    }
+
+    async deleteManager({ params, response }: HttpContext) {
+        try {
+            const admin = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.MANAGER)
+                .first()
+
+            if (!admin) {
+                return response.notFound({ status: 'error', message: 'Manager introuvable' })
+            }
+
+            await admin.delete()
+            return response.ok({ status: 'success', message: 'Manager supprimé avec succès' })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de supprimer le Manager')
+        }
+    }
+
+    async deleteAdmin({ params, response }: HttpContext) {
+        try {
+            const admin = await User.query()
+                .where('id', params.id)
+                .andWhere('role', Role.ADMIN)
+                .first()
+
+            if (!admin) {
+                return response.notFound({ status: 'error', message: 'Admin introuvable' })
+            }
+
+            await admin.delete()
+            return response.ok({ status: 'success', message: 'Admin supprimé avec succès' })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de supprimer l’admin')
+        }
+    }
+
+    /**
+     * POST /users/forgot-password
+     * Crée un token de reset et envoie (ou retourne) l’info
+     */
+    async forgotPassword({ request, response }: HttpContext) {
+        try {
+            const { email } = await request.validateUsing(forgotPasswordValidator)
+            const user = await User.findBy('email', email)
+            if (!user) {
+                return response.ok({
+                    status: 'success',
+                    message:
+                        'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
+                })
+            }
+            const rawToken = crypto.randomBytes(32).toString('hex')
+            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+
+            user.resetToken = hashed
+            user.resetExpires = DateTime.utc().plus({ hours: 1 })
+            await user.save()
+
+            const resetUrl = `${process.env.FRONT_URL}/confirm-password/${rawToken}`
+
+            /*
+            await Mail.send((message) => {
+                message
+                .to(user.email)
+                .from('no-reply@monapp.com')
+                .subject('Réinitialisation de votre mot de passe')
+                .htmlView('emails/confirm-password', { resetUrl })
+            })
+            */
+            return response.ok({
+                status: 'success',
+                message: 'Un email de réinitialisation a été envoyé',
+                data: {
+                    resetUrl, // pratique pour dev front
+                },
             })
         } catch (error) {
             console.error(error)
             return response.internalServerError({
                 status: 'error',
-                message: 'Échec de la recherche des managers',
+                message: 'Impossible d’initier la réinitialisation',
             })
         }
     }

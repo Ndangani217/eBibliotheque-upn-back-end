@@ -1,5 +1,5 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
-import { Status } from '../../app/types/status/index.js'
+import { Status } from '#types/status'
 
 export default class extends BaseSchema {
     protected tableName = 'rooms'

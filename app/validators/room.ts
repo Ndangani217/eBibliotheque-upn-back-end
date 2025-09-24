@@ -1,5 +1,5 @@
 import vine from '@vinejs/vine'
-import { Status } from '../types/status/index.js'
+import { Status } from '#types/status'
 
 export const createRoomValidator = vine.compile(
     vine.object({
@@ -10,7 +10,6 @@ export const createRoomValidator = vine.compile(
         availableSpots: vine.number().range([0, 4]), // Places disponibles (0-100)
         location: vine.string().maxLength(255), // Localisation (max 255)
         isAvailable: vine.boolean(), // Salle réservable ou non
-        //currentMembers: vine.array(vine.string()).optional(), // Liste d’IDs ou emails
         description: vine.string().maxLength(500).optional(), // Description (max 500
     }),
 )

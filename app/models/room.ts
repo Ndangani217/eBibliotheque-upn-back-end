@@ -1,8 +1,7 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
-import Student from '#models/student'
-import { Status } from '../types/status/index.js'
+import { Status } from '#types/status'
 
 export default class Room extends BaseModel {
     @column({ isPrimary: true })
@@ -26,7 +25,7 @@ export default class Room extends BaseModel {
     declare isAvailable: boolean
 
     @column()
-    declare currentMembers: number[] //modifier
+    declare currentMembers: number[]
 
     @column()
     declare description: string
