@@ -121,17 +121,25 @@ export default class RoomsController {
                 })
             }
 
-            // Vérifier la capacité
-            if (room.availableSpots <= 0 || room.capacity !== 4) {
+            // Vérifier la capacité disponible
+            if (room.availableSpots <= 0) {
                 return response.conflict({
                     status: 'error',
-                    message: 'Cette chambre ne peut pas accueillir plus de 4 étudiants',
+                    message: 'Cette chambre est déjà complète',
                 })
             }
 
             // Assigner l’étudiant
             await room.related('students').attach([studentId])
-            room.availableSpots -= 1
+
+            // Recalcule le nombre d’étudiants dans la chambre
+            const count = await room.related('students').query().count('* as total')
+            const totalStudents = Number(count[0].$extras.total)
+
+            // Mettre à jour les infos de la chambre
+            room.availableSpots = room.capacity - totalStudents
+            room.isAvailable = room.availableSpots > 0
+            room.occupancyStatus = room.availableSpots > 0 ? Status.DISPONIBLE : Status.OCCUPEE
             await room.save()
 
             return response.ok({
