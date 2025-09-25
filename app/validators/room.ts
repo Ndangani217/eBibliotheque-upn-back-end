@@ -1,33 +1,31 @@
 import vine from '@vinejs/vine'
 import { Status } from '#types/status'
+import { Gender } from '#types/gender'
 
 export const createRoomValidator = vine.compile(
     vine.object({
-        id: vine.string().regex(/^[A-Z]{2}-\d{3}$/), // Identifiant format "AA-000"
-        type: vine.string(), // Type de salle (ex: labo, amphi, bureau)
-        capacity: vine.number().range([0, 10]), // Capacité max (1-100)
+        //id: vine.string().regex(/^[A-Z]{2}-\d{3}$/), // ex: "RM-001"
+        type: vine.enum(Object.values(Gender)),
+        capacity: vine.number().range([1, 4]), // Capacité max (1-4)
         occupancyStatus: vine.enum(Object.values(Status)), // Statut d’occupation
-        availableSpots: vine.number().range([0, 4]), // Places disponibles (0-100)
-        location: vine.string().maxLength(255), // Localisation (max 255)
-        isAvailable: vine.boolean(), // Salle réservable ou non
-        description: vine.string().maxLength(500).optional(), // Description (max 500
+        availableSpots: vine.number().range([0, 4]), // Places disponibles (0-4)
+        location: vine.string().maxLength(50), // Localisation (max 255)
+        isAvailable: vine.boolean(), // Liste d’IDs ou emails
+        description: vine.string().maxLength(100).optional(),
     }),
 )
 
 export const updateRoomValidator = vine.compile(
     vine.object({
-        id: vine
-            .string()
-            .regex(/^[A-Z]{2}-\d{3}$/)
-            .optional(), // Identifiant format "AA-000"
-        type: vine.string().optional(), // Type de salle (ex: labo, amphi, bureau)
-        capacity: vine.number().range([0, 10]).optional(), // Capacité max (1-100)
-        occupancyStatus: vine.enum(Object.values(Status)).optional(), // Statut d’occupation
-        availableSpots: vine.number().range([0, 4]).optional(), // Places disponibles (0-100)
-        location: vine.string().maxLength(255).optional(), // Localisation (max 255)
-        isAvailable: vine.boolean().optional(), // Salle réservable ou non
-        currentMembers: vine.array(vine.string()).optional(), // Liste d’IDs ou emails
-        description: vine.string().maxLength(500).optional(), // Description (max 500
+        //id: vine.string().regex(/^[A-Z]{2}-\d{3}$/).optional(),
+        type: vine.enum(Object.values(Gender)).optional(),
+        capacity: vine.number().range([1, 4]).optional(),
+        occupancyStatus: vine.enum(Object.values(Status)).optional(),
+        availableSpots: vine.number().range([0, 4]).optional(),
+        location: vine.string().maxLength(50).optional(),
+        isAvailable: vine.boolean().optional(),
+        currentMembers: vine.array(vine.number().positive()).optional(),
+        description: vine.string().maxLength(100).optional(),
     }),
 )
 

@@ -69,7 +69,7 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
         router.get('/managers/:id', [UsersController, 'getManagerById'])
         router
-            .post('/managers', [UsersController, 'createManager'])
+            .post('/manager', [UsersController, 'createManager'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
         router
             .put('/managers/:id', [UsersController, 'updateManager'])
@@ -95,61 +95,73 @@ router
         router.post('/logout', [UsersController, 'logout']).middleware([middleware.auth()])
     })
     .prefix('/users')
-
+    
 router
     .group(() => {
-        // Routes Chambres
         router
-            .post('/rooms', [RoomsController, 'createRoom'])
+            .post('/create', [RoomsController, 'createRoom'])
             .middleware([middleware.auth(), middleware.hasRole([Role.MANAGER])])
+
         router
-            .get('/rooms', [RoomsController, 'getRooms'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .get('/rooms/:id', [RoomsController, 'getRoomById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ])
-        router
-            .put('/rooms/:id', [RoomsController, 'updateRoom'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .delete('/rooms/:id', [RoomsController, 'deleteRoom'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .post('/rooms/:id/assign-student', [RoomsController, 'assignRoomStudent'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .post('/rooms/:id/remove-student', [RoomsController, 'removeRoomStudent'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .get('/rooms/:id/students', [RoomsController, 'getRoomStudents'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ])
-        router
-            .post('/rooms/:id/transfer-student', [RoomsController, 'transferStudentRoom'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .get('/rooms/available', [RoomsController, 'getAvailableRooms'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .get('/rooms/occupied', [RoomsController, 'getOccupiedRooms'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-        router
-            .patch('/rooms/:id/status', [RoomsController, 'updateRoomStatus'])
+            .get('/', [RoomsController, 'getRooms'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
         router
-            .get('/rooms/:id/capacity', [RoomsController, 'getRoomCapacityInfo'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+            .get('/:id', [RoomsController, 'getRoomById'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
         router
-            .post('/rooms/:id/clear', [RoomsController, 'clearRoom'])
+            .put('/:id', [RoomsController, 'updateRoom'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
         router
-            .get('/rooms/search', [RoomsController, 'searchRooms'])
+            .delete('/:id', [RoomsController, 'deleteRoom'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .post('/:id/assign-student', [RoomsController, 'assignRoomStudent'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .post('/:id/remove-student', [RoomsController, 'removeRoomStudent'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/:id/students', [RoomsController, 'getRoomStudents'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
+        router
+            .post('/:id/transfer-student', [RoomsController, 'transferStudentRoom'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/available', [RoomsController, 'getAvailableRooms'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/occupied', [RoomsController, 'getOccupiedRooms'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .patch('/:id/status', [RoomsController, 'updateRoomStatus'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/:id/capacity', [RoomsController, 'getRoomCapacityInfo'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .post('/:id/clear', [RoomsController, 'clearRoom'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/search', [RoomsController, 'searchRooms'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
     })
     .prefix('/rooms')

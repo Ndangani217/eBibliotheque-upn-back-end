@@ -1,28 +1,20 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
-import { Status } from '#types/status'
 
 export default class extends BaseSchema {
     protected tableName = 'rooms'
 
     async up() {
         this.schema.createTable(this.tableName, (table) => {
-            table.string('id').primary()
+            table.increments('id').primary().notNullable()
             table.string('type').notNullable()
-            table.integer('capacity').notNullable()
-            table
-                .enum('occupancy_status', Object.values(Status), {
-                    useNative: true,
-                    enumName: 'room_status_enum',
-                })
-                .notNullable()
-            table.integer('available_spots').notNullable()
-            table.string('location').notNullable()
-            table.boolean('is_available').defaultTo(true)
-            table.specificType('current_members', 'integer[]').defaultTo('{}')
-            table.string('description', 500)
-
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
+            table.string('location').nullable()
+            table.integer('capacity').notNullable().defaultTo(4) // capacité fixe
+            table.integer('available_spots').notNullable().defaultTo(4) // dispo initiale
+            table.string('occupancy_status').notNullable().defaultTo('Disponible')
+            table.boolean('is_available').notNullable().defaultTo(true)
+            table.string('description', 255).nullable()
+            table.timestamp('created_at', { useTz: true })
+            table.timestamp('updated_at', { useTz: true })
         })
     }
 

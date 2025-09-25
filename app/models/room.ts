@@ -1,8 +1,8 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
+import type { ManyToMany } from '@adonisjs/lucid/types/relations'
+import User from '#models/user'
 import { Status } from '#types/status'
-
 export default class Room extends BaseModel {
     @column({ isPrimary: true })
     declare id: string
@@ -25,10 +25,14 @@ export default class Room extends BaseModel {
     declare isAvailable: boolean
 
     @column()
-    declare currentMembers: number[]
-
-    @column()
     declare description: string
+
+    @manyToMany(() => User, {
+        pivotTable: 'room_students',
+        pivotForeignKey: 'room_id',
+        pivotRelatedForeignKey: 'student_id',
+    })
+    declare students: ManyToMany<typeof User>
 
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime

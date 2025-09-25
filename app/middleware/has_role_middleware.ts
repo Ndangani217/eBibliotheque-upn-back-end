@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
-import { Role } from '../types/role/index.js'
+import { Role } from '#types/role'
 
 export default class HasRoleMiddleware {
     async handle(ctx: HttpContext, next: NextFn, roles: string[]) {

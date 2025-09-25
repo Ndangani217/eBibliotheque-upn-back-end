@@ -1,12 +1,14 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Room from '#models/room'
+import User from '#models/user'
 import {
     createRoomValidator,
     updateRoomValidator,
     transferStudentValidator,
 } from '#validators/room'
-import { assignStudentValidator } from '#validators/student'
-import { Status } from '../types/status/index.js'
+import { assignStudentValidator } from '#validators/user'
+import { Status } from '#types/status'
+import { Role } from '#types/role'
 
 export default class RoomsController {
     // Créer une chambre
@@ -57,7 +59,7 @@ export default class RoomsController {
     async updateRoom({ request, params, response }: HttpContext) {
         try {
             const room = await Room.findOrFail(params.id)
-            const payload = await request.validateUsing(createRoomValidator)
+            const payload = await request.validateUsing(updateRoomValidator)
             room.merge(payload)
             await room.save()
 
@@ -91,51 +93,57 @@ export default class RoomsController {
     // Affecter un étudiant
     async assignRoomStudent({ params, request, response }: HttpContext) {
         try {
-            // Récupérer la chambre par ID
             const room = await Room.findOrFail(params.id)
-
-            if (!room) {
-                return response.notFound({
-                    status: 'error',
-                    message: 'Chambre non trouvée',
-                })
-            }
-            // Valider les données de la requête (ex: studentId)
             const { studentId } = await request.validateUsing(assignStudentValidator)
 
-            // Vérifier si l'étudiant est déjà dans la chambre
-            if (room.currentMembers.includes(studentId)) {
-                return response.conflict({
+            // Vérifier que l'étudiant existe ET a le rôle STUDENT
+            const student = await User.query()
+                .where('id', studentId)
+                .andWhere('role', Role.STUDENT)
+                .first()
+
+            if (!student) {
+                return response.notFound({
                     status: 'error',
-                    message: 'L’étudiant est déjà assigné à cette chambre',
+                    message: 'Étudiant introuvable ou rôle invalide',
                 })
             }
 
-            // Vérifier qu’il reste des places disponibles
-            if (room.availableSpots <= 0) {
+            // Vérifier si l'étudiant est déjà assigné à une chambre
+            const alreadyAssignedRoom = await Room.query()
+                .whereHas('students', (q) => q.where('users.id', studentId))
+                .first()
+
+            if (alreadyAssignedRoom) {
                 return response.conflict({
                     status: 'error',
-                    message: 'Aucune place disponible dans cette chambre',
+                    message: `Cet étudiant est déjà assigné à la chambre ${alreadyAssignedRoom.id}`,
                 })
             }
 
-            // Ajouter l’étudiant à la chambre
-            room.currentMembers.push(studentId)
+            // Vérifier la capacité
+            if (room.availableSpots <= 0 || room.capacity !== 4) {
+                return response.conflict({
+                    status: 'error',
+                    message: 'Cette chambre ne peut pas accueillir plus de 4 étudiants',
+                })
+            }
+
+            // Assigner l’étudiant
+            await room.related('students').attach([studentId])
             room.availableSpots -= 1
-
-            // Sauvegarder les changements
             await room.save()
 
             return response.ok({
                 status: 'success',
-                message: 'Étudiant assigné à la chambre avec succès',
-                data: room,
+                message: 'Étudiant assigné avec succès',
+                data: { room, student },
             })
         } catch (error) {
             console.error(error)
             return response.internalServerError({
                 status: 'error',
-                message: 'Échec de l’assignation de l’étudiant',
+                message: 'Échec de l’assignation',
             })
         }
     }
@@ -144,31 +152,46 @@ export default class RoomsController {
     async removeRoomStudent({ request, params, response }: HttpContext) {
         try {
             const room = await Room.findOrFail(params.id)
-            if (!room) {
+            const { studentId } = await request.validateUsing(assignStudentValidator)
+
+            // Vérifier que l'étudiant existe ET a le rôle STUDENT
+            const student = await User.query()
+                .where('id', studentId)
+                .andWhere('role', Role.STUDENT)
+                .first()
+
+            if (!student) {
                 return response.notFound({
                     status: 'error',
-                    message: 'Chambre non trouvée',
+                    message: 'Étudiant introuvable ou rôle invalide',
                 })
             }
 
-            const { studentId } = await request.validateUsing(assignStudentValidator)
+            // Vérifier si l'étudiant est bien assigné à cette chambre
+            const isAssigned = await room
+                .related('students')
+                .query()
+                .where('users.id', studentId)
+                .first()
 
-            if (!room.currentMembers.includes(studentId)) {
+            if (!isAssigned) {
                 return response.notFound({
                     status: 'error',
                     message: 'L’étudiant n’est pas assigné à cette chambre',
                 })
             }
 
-            room.currentMembers = room.currentMembers.filter((id) => id !== studentId)
-            room.availableSpots += 1
+            // Retirer l'étudiant via la table pivot
+            await room.related('students').detach([studentId])
 
+            // Libérer une place
+            room.availableSpots += 1
             await room.save()
 
             return response.ok({
                 status: 'success',
                 message: 'Étudiant retiré avec succès',
-                data: room,
+                data: { room, student },
             })
         } catch (error) {
             console.error(error)
@@ -182,19 +205,11 @@ export default class RoomsController {
     // Lister les étudiants d'une chambre
     async getRoomStudents({ params, response }: HttpContext) {
         try {
-            const room = await Room.findOrFail(params.id)
-            if (!room) {
-                return response.notFound({
-                    status: 'error',
-                    message: 'Chambre non trouvée',
-                })
-            }
-
-            const studentIds = room.currentMembers
+            const room = await Room.query().where('id', params.id).preload('students').firstOrFail()
 
             return response.ok({
                 status: 'success',
-                data: studentIds,
+                data: room.students,
                 message: 'Liste des étudiants récupérée avec succès',
             })
         } catch (error) {
@@ -233,7 +248,7 @@ export default class RoomsController {
             // Récupérer toutes les chambres où availableSpots = 0 ou occupancyStatus = 'occupied'
             const rooms = await Room.query()
                 .where('availableSpots', 0)
-                .orWhere('occupancyStatus', 'occupied')
+                .orWhere('occupancyStatus', 'Occupée')
 
             return response.ok({
                 status: 'success',
@@ -316,23 +331,34 @@ export default class RoomsController {
         try {
             const { studentId, targetRoomId } =
                 await request.validateUsing(transferStudentValidator)
-            const sourceRoom = await Room.findOrFail(params.id)
+            // Vérifier que l'étudiant existe ET a le rôle STUDENT
+            const student = await User.query()
+                .where('id', studentId)
+                .andWhere('role', Role.STUDENT)
+                .first()
 
-            if (!sourceRoom) {
+            if (!student) {
                 return response.notFound({
                     status: 'error',
-                    message: 'Chambre non trouvée',
+                    message: 'Étudiant introuvable ou rôle invalide',
                 })
             }
+            const sourceRoom = await Room.findOrFail(params.id)
+            const targetRoom = await Room.findOrFail(targetRoomId)
+            // Vérifier si l'étudiant est bien dans la chambre source
+            const isInSource = await sourceRoom
+                .related('students')
+                .query()
+                .where('users.id', studentId)
+                .first()
 
-            if (!sourceRoom.currentMembers.includes(studentId)) {
+            if (!isInSource) {
                 return response.notFound({
                     status: 'error',
                     message: 'L’étudiant n’est pas assigné à la chambre source',
                 })
             }
 
-            const targetRoom = await Room.findOrFail(targetRoomId)
             if (targetRoom.availableSpots <= 0) {
                 return response.conflict({
                     status: 'error',
@@ -340,21 +366,19 @@ export default class RoomsController {
                 })
             }
 
-            sourceRoom.currentMembers = sourceRoom.currentMembers.filter((id) => id !== studentId)
+            // Transfert
+            await sourceRoom.related('students').detach([studentId])
             sourceRoom.availableSpots += 1
             await sourceRoom.save()
 
-            targetRoom.currentMembers.push(studentId)
+            await targetRoom.related('students').attach([studentId])
             targetRoom.availableSpots -= 1
             await targetRoom.save()
 
             return response.ok({
                 status: 'success',
                 message: 'Étudiant transféré avec succès',
-                data: {
-                    sourceRoom,
-                    targetRoom,
-                },
+                data: { sourceRoom, targetRoom, student },
             })
         } catch (error) {
             console.error(error)
@@ -366,18 +390,16 @@ export default class RoomsController {
     }
 
     // Vider une chambre
+    // Vider une chambre
     async clearRoom({ params, response }: HttpContext) {
         try {
             const room = await Room.findOrFail(params.id)
-            if (!room) {
-                return response.notFound({
-                    status: 'error',
-                    message: 'Chambre non trouvée',
-                })
-            }
-            room.currentMembers = []
-            room.availableSpots = room.capacity
 
+            // Supprimer toutes les relations dans le pivot
+            await room.related('students').detach()
+
+            // Réinitialiser les places
+            room.availableSpots = room.capacity
             await room.save()
 
             return response.ok({
@@ -412,7 +434,7 @@ export default class RoomsController {
             }
 
             if (isAvailable !== undefined) {
-                query.where('isAvailable', isAvailable === 'true') // conversion string -> boolean
+                query.where('isAvailable', isAvailable === 'true')
             }
 
             if (location) {

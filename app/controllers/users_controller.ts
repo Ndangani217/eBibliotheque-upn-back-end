@@ -2,7 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { Role } from '#types/role'
 import crypto from 'node:crypto'
-import hash from '@adonisjs/core/services/hash'
 import { DateTime } from 'luxon'
 import {
     loginValidator,
@@ -13,7 +12,6 @@ import {
     updateAdminValidator,
     forgotPasswordValidator,
     resetPasswordValidator,
-    changePasswordValidator,
 } from '#validators/user'
 
 // -------------------------
@@ -215,7 +213,6 @@ export default class UsersController {
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
-            console.log(payload)
 
             const user = await User.create({
                 ...payload,
