@@ -20,6 +20,7 @@ import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
+const ReservationsController = () => import('#controllers/reservations_controller')
 import { Role } from '#types/role'
 router
     .group(() => {
@@ -95,7 +96,7 @@ router
         router.post('/logout', [UsersController, 'logout']).middleware([middleware.auth()])
     })
     .prefix('/users')
-    
+
 router
     .group(() => {
         router
@@ -165,3 +166,52 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
     })
     .prefix('/rooms')
+
+// CRUD Réservations
+router
+    .group(() => {
+        router
+            .post('/', [ReservationsController, 'create'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
+
+        router
+            .get('/', [ReservationsController, 'getAllReservations'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/status', [ReservationsController, 'getByStatus'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/:id', [ReservationsController, 'getById'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+        router
+            .put('/:id', [ReservationsController, 'update'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .put('/:id/approve', [ReservationsController, 'approve'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .put('/:id/reject', [ReservationsController, 'reject'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .put('/:id/cancel', [ReservationsController, 'cancel'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
+        router
+            .delete('/:id', [ReservationsController, 'delete'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+    })
+    .prefix('/reservations')
