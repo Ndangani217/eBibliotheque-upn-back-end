@@ -22,6 +22,7 @@ const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
 const ReservationsController = () => import('#controllers/reservations_controller')
 import { Role } from '#types/role'
+
 router
     .group(() => {
         // STUDENTS

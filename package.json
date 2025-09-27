@@ -5,9 +5,10 @@
     "type": "module",
     "license": "UNLICENSED",
     "scripts": {
-        "start": "node bin/server.js",
+        "start": "node build/server.js",
         "build": "node ace build",
         "dev": "node ace serve --hmr",
+        "seed": "node ace db:seed",
         "test": "node ace test",
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
@@ -60,6 +61,7 @@
         "@vinejs/vine": "^3.0.1",
         "luxon": "^3.7.1",
         "module-alias": "^2.2.3",
+        "openai": "^5.23.1",
         "pg": "^8.16.3",
         "reflect-metadata": "^0.2.2"
     },
