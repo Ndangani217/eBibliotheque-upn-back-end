@@ -50,9 +50,8 @@ router
             .get('/admins', [UsersController, 'getAdmins'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
         router.get('/admins/:id', [UsersController, 'getAdminById'])
-        router
-            .post('/admins', [UsersController, 'createAdmin'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+        router.post('/admins', [UsersController, 'createAdmin'])
+
         router
             .put('/admins/:id', [UsersController, 'updateAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])

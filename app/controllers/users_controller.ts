@@ -251,7 +251,7 @@ export default class UsersController {
 
     async createAdmin({ request, response }: HttpContext) {
         try {
-            const payload = await request.validateUsing(updateAdminValidator)
+            const payload = await request.validateUsing(createManagerValidator)
 
             const user = await User.create({
                 ...payload,

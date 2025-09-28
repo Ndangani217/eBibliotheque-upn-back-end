@@ -74,7 +74,7 @@ export default class ReservationsController {
 
             const reservations = await Reservation.query()
                 .preload('student', (studentQuery) => {
-                    studentQuery.preload('faculty')
+                    studentQuery.preload('facultyCode')
                 })
                 .preload('room')
                 .orderBy('created_at', 'desc')

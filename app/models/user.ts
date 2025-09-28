@@ -35,7 +35,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
     declare phoneNumber: string
 
     @column()
-    declare faculty: string
+    declare faculty: string | null
 
     @belongsTo(() => Faculty, {
         foreignKey: 'faculty',
