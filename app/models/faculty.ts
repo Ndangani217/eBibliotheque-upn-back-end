@@ -5,10 +5,9 @@ import User from '#models/user'
 import { Role } from '#types/role'
 
 export default class Faculty extends BaseModel {
-    @column({ isPrimary: true })
-    declare id: number
+    public static primaryKey = 'code'
 
-    @column()
+    @column({ isPrimary: true })
     declare code: string
 
     @column()

@@ -2,7 +2,6 @@ import { BaseSchema } from '@adonisjs/lucid/schema'
 import { Role } from '#types/role'
 import { Promotion } from '#types/promotion'
 import { Gender } from '#types/gender'
-import Faculty from '#models/faculty'
 
 export default class extends BaseSchema {
     protected tableName = 'users'
@@ -16,7 +15,7 @@ export default class extends BaseSchema {
             table.enum('gender', Object.values(Gender)).nullable()
             table.string('phone_number').unique()
 
-            table.enum('faculty_code', Object.values(Faculty)).nullable()
+            table.string('faculty').nullable().references('code').inTable('faculties')
 
             table.string('department').nullable()
             table.enum('promotion', Object.values(Promotion)).nullable()

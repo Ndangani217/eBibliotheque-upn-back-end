@@ -69,22 +69,23 @@ export default class ReservationsController {
     // Lister toutes les réservations
     async getAllReservations({ request, response }: HttpContext) {
         try {
-            const page = request.input('page', 1) // par défaut page 1
-            const limit = request.input('limit', 10) // par défaut 10 éléments
+            const page = request.input('page', 1)
+            const limit = request.input('limit', 10)
 
             const reservations = await Reservation.query()
-                .preload('student')
+                .preload('student', (studentQuery) => {
+                    studentQuery.preload('faculty')
+                })
                 .preload('room')
                 .orderBy('created_at', 'desc')
                 .paginate(page, limit)
 
-            // Pour transformer la pagination en JSON "propre"
             reservations.baseUrl('/reservations')
 
             return response.ok({
                 status: 'success',
                 message: 'Réservations paginées récupérées avec succès',
-                data: reservations, // contient meta + data
+                data: reservations,
             })
         } catch (error) {
             console.error(error)

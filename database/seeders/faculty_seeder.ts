@@ -4,7 +4,6 @@ import Faculty from '#models/faculty'
 export default class extends BaseSeeder {
     async run() {
         await Faculty.truncate(true)
-        // Write your database queries inside the run method
         await Faculty.createMany([
             { code: 'SPA', name: 'Sciences Sociales, Administratives et Politiques' },
             { code: 'SEG', name: 'Sciences Économiques et de Gestion' },
@@ -16,7 +15,7 @@ export default class extends BaseSeeder {
             { code: 'SS', name: 'Sciences de la Santé' },
             { code: 'MV', name: 'Médecine Vétérinaire' },
             { code: 'PSE', name: 'Psychologie et Sciences de l’Éducation' },
-            { code: 'ETTS', name: 'École de Télécommunication, Téléinformatique ESPACIALE' },
+            { code: 'ETTS', name: 'École de Télécommunication, Téléinformatique et Spéciale' },
         ])
     }
 }

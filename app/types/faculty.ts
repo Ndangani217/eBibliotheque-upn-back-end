@@ -1,5 +1,5 @@
 export enum Faculty {
-    SSAP = 'SSAP', // Sciences Sociales, Administratives et Politiques
+    SPA = 'SPA', // Sciences Sociales, Administratives et Politiques
     SEG = 'SEG', // Sciences Économiques et de Gestion
     SAE = 'SAE', // Sciences Agronomiques et Environnement
     PDD = 'PDD', // Pédagogie et Didactique des Disciplines
@@ -9,5 +9,5 @@ export enum Faculty {
     SS = 'SS', // Sciences de la Santé
     MV = 'MV', // Médecine Vétérinaire
     PSE = 'PSE', // Psychologie et Sciences de l’Éducation
-    ETT = 'ETT', // École de Télécommunication et Téléinformatique
+    ETTS = 'ETSS', // École de Télécommunication, Téléinformatique et Spéciale
 }

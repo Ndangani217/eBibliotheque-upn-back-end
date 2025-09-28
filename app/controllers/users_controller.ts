@@ -213,7 +213,6 @@ export default class UsersController {
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
-
             const user = await User.create({
                 ...payload,
                 role: Role.STUDENT,
