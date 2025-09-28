@@ -20,6 +20,22 @@ export default class ReservationsController {
                     message: 'Utilisateur invalide, seul un étudiant peut réserver',
                 })
             }
+
+            // Vérifier si l'étudiant a déjà une réservation en attente ou approuvée
+            const existingReservation = await Reservation.query()
+                .where('student_id', payload.studentId)
+                .whereIn('status', [ReservationStatus.EN_ATTENTE, ReservationStatus.APPROUVEE])
+                .first()
+
+            if (existingReservation) {
+                return response.conflict({
+                    status: 'error',
+                    message:
+                        'Vous avez déjà une réservation en cours. Impossible d’en créer une nouvelle.',
+                    data: existingReservation,
+                })
+            }
+
             // Vérifier si la chambre existe et est disponible
             const room = await Room.find(payload.roomId)
             if (!room || !room.isAvailable || room.availableSpots <= 0) {
@@ -28,6 +44,7 @@ export default class ReservationsController {
                     message: 'Chambre non disponible',
                 })
             }
+
             const reservation = await Reservation.create({
                 studentId: payload.studentId,
                 roomId: payload.roomId ?? null,

@@ -4,9 +4,7 @@ import { Role } from '#types/role'
 
 export default class extends BaseSeeder {
     public async run() {
-        // Vérifier si un admin existe déjà
         const existingAdmin = await User.query().where('role', Role.ADMIN).first()
-
         if (!existingAdmin) {
             await User.createMany([
                 {

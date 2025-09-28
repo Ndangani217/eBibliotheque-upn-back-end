@@ -101,6 +101,21 @@ router
 router
     .group(() => {
         router
+            .get('/available', [RoomsController, 'getAvailableRooms'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
+        router
+            .get('/occupied', [RoomsController, 'getOccupiedRooms'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/search', [RoomsController, 'searchRooms'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
             .post('/create', [RoomsController, 'createRoom'])
             .middleware([middleware.auth(), middleware.hasRole([Role.MANAGER])])
 
@@ -143,14 +158,6 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
         router
-            .get('/available', [RoomsController, 'getAvailableRooms'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .get('/occupied', [RoomsController, 'getOccupiedRooms'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
             .patch('/:id/status', [RoomsController, 'updateRoomStatus'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
@@ -160,10 +167,6 @@ router
 
         router
             .post('/:id/clear', [RoomsController, 'clearRoom'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .get('/search', [RoomsController, 'searchRooms'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
     })
     .prefix('/rooms')
@@ -216,52 +219,3 @@ router
             ])
     })
     .prefix('/reservations')
-
-// CRUD Réservations
-router
-    .group(() => {
-        router
-            .post('/', [ReservationsController, 'create'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
-
-        router
-            .get('/', [ReservationsController, 'getAllReservations'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .get('/status', [ReservationsController, 'getByStatus'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .get('/:id', [ReservationsController, 'getById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ])
-        router
-            .put('/:id', [ReservationsController, 'update'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .put('/:id/approve', [ReservationsController, 'approve'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .put('/:id/reject', [ReservationsController, 'reject'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .put('/:id/cancel', [ReservationsController, 'cancel'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ])
-
-        router
-            .delete('/:id', [ReservationsController, 'delete'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ])
-    })
-    .prefix('/reservat')

@@ -5,7 +5,7 @@ import User from '#models/user'
 import { Status } from '#types/status'
 export default class Room extends BaseModel {
     @column({ isPrimary: true })
-    declare id: string
+    declare id: number
 
     @column()
     declare type: string

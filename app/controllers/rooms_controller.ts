@@ -231,6 +231,7 @@ export default class RoomsController {
     async getAvailableRooms({ response }: HttpContext) {
         try {
             const rooms = await Room.query()
+                .select('id', 'location', 'type', 'availableSpots')
                 .where('isAvailable', true)
                 .andWhere('availableSpots', '>', 0)
 
