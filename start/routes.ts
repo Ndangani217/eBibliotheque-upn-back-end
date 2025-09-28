@@ -174,15 +174,19 @@ router
 router
     .group(() => {
         router
+            .get('/search', [ReservationsController, 'searchByStudentName'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .get('/status', [ReservationsController, 'getByStatus'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
             .post('/', [ReservationsController, 'create'])
             .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
 
         router
             .get('/', [ReservationsController, 'getAllReservations'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
-
-        router
-            .get('/status', [ReservationsController, 'getByStatus'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
         router

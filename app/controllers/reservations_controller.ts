@@ -6,6 +6,7 @@ import { Role } from '#types/role'
 import { ReservationStatus } from '#types/reservationStatus'
 import { createReservationValidator, updateReservationValidator } from '#validators/reservation'
 import { Status } from '#types/status'
+import { Console } from 'node:console'
 
 export default class ReservationsController {
     async create({ request, response }: HttpContext) {
@@ -80,12 +81,12 @@ export default class ReservationsController {
                 .orderBy('created_at', 'desc')
                 .paginate(page, limit)
 
-            reservations.baseUrl('/reservations')
+            const serialized = reservations.toJSON()
 
             return response.ok({
                 status: 'success',
                 message: 'Réservations paginées récupérées avec succès',
-                data: reservations,
+                ...serialized,
             })
         } catch (error) {
             console.error(error)
@@ -337,6 +338,46 @@ export default class ReservationsController {
             return response.internalServerError({
                 status: 'error',
                 message: 'Échec de l’annulation de la réservation',
+            })
+        }
+    }
+
+    //ajouter dans ReservationsController
+    async searchByStudentName({ request, response }: HttpContext) {
+        try {
+            const page = request.input('page', 1)
+            const limit = request.input('limit', 10)
+            const search = request.input('search', '').trim()
+            console.log('Search query:', search)
+            console.log('Page:', page, 'Limit:', limit)
+
+            const query = Reservation.query()
+                .preload('student')
+                .preload('room')
+                .orderBy('created_at', 'desc')
+
+            if (search) {
+                query.whereHas('student', (studentQuery) => {
+                    studentQuery
+                        .whereILike('first_name', `%${search}%`)
+                        .orWhereILike('last_name', `%${search}%`)
+                })
+            }
+
+            const reservations = await query.paginate(page, limit)
+
+            const serialized = reservations.toJSON()
+
+            return response.ok({
+                status: 'success',
+                message: 'Résultats de recherche',
+                ...serialized,
+            })
+        } catch (error) {
+            console.error(error)
+            return response.internalServerError({
+                status: 'error',
+                message: 'Erreur lors de la recherche des réservations',
             })
         }
     }
