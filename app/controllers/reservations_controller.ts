@@ -6,13 +6,11 @@ import { Role } from '#types/role'
 import { ReservationStatus } from '#types/reservationStatus'
 import { createReservationValidator, updateReservationValidator } from '#validators/reservation'
 import { Status } from '#types/status'
-import { Console } from 'node:console'
 
 export default class ReservationsController {
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createReservationValidator)
-
             // Vérifier si l'étudiant existe et a le rôle STUDENT
             const student = await User.find(payload.studentId)
             if (!student || student.role !== Role.STUDENT) {

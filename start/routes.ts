@@ -189,12 +189,11 @@ router
             .get('/', [ReservationsController, 'getAllReservations'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
-        router
-            .get('/:id', [ReservationsController, 'getById'])
-            .middleware([
+        router.get('/:id', [ReservationsController, 'getById'])
+        /*.middleware([
                 middleware.auth(),
                 middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ])
+            ]*/
         router
             .put('/:id', [ReservationsController, 'update'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
