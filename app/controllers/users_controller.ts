@@ -371,7 +371,7 @@ export default class UsersController {
     }
 
     // -------------------------
-    // SEARCH USERS
+    // SEARCH STUDENTS
     // -------------------------
     async searchStudents({ request, response }: HttpContext) {
         try {
@@ -379,13 +379,25 @@ export default class UsersController {
 
             const query = User.query().where('role', Role.STUDENT).andWhere('is_verified', true)
 
-            if (email) query.whereILike('email', `%${email}%`)
-            if (name) {
-                query.whereRaw("concat(first_name, ' ', name, ' ', last_name) ILIKE ?", [
-                    `%${name}%`,
-                ])
+            // Recherche par email
+            if (email) {
+                query.whereILike('email', `%${email}%`)
             }
-            if (facultyCode) query.where('faculty_code', facultyCode)
+
+            // Recherche par prénom / postnom / nom
+            if (name) {
+                query.where((subQuery) => {
+                    subQuery
+                        .whereILike('first_name', `%${name}%`)
+                        .orWhereILike('name', `%${name}%`)
+                        .orWhereILike('last_name', `%${name}%`)
+                })
+            }
+
+            // Filtrer par faculté
+            if (facultyCode) {
+                query.where('faculty_code', facultyCode)
+            }
 
             const students = await query
 

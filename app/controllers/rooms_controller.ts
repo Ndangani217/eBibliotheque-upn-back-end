@@ -27,16 +27,21 @@ export default class RoomsController {
         }
     }
 
-    // Lister toutes les chambres
-    async getRooms({ response }: HttpContext) {
+    async getRooms({ request, response }: HttpContext) {
         try {
-            const room = await Room.all()
+            const page = request.input('page', 1)
+            const limit = request.input('limit', 10)
+
+            const rooms = await Room.query().orderBy('created_at', 'desc').paginate(page, limit)
+
             return response.ok({
                 status: 'success',
-                message: 'Rooms details',
-                data: room,
+                message: 'Rooms details paginated',
+                meta: rooms.toJSON().meta,
+                data: rooms.toJSON().data,
             })
         } catch (err) {
+            console.error(err)
             return response.internalServerError({ error: 'Failed to get Rooms' })
         }
     }
@@ -44,7 +49,8 @@ export default class RoomsController {
     // Voir une chambre
     async getRoomById({ params, response }: HttpContext) {
         try {
-            const room = await Room.findBy('id', params.id)
+            const room = await Room.query().where('id', params.id).preload('students').firstOrFail()
+
             return response.ok({
                 status: 'success',
                 message: 'Room details',
@@ -424,36 +430,29 @@ export default class RoomsController {
     }
 
     // Recherche de chambres
+    // Recherche de chambres
     async searchRooms({ request, response }: HttpContext) {
         try {
-            // Récupérer les critères depuis les paramètres de requête
-            const { type, occupancyStatus, isAvailable, location } = request.qs()
+            const page = request.input('page', 1)
+            const limit = request.input('limit', 10)
+            const search = request.input('search', '')
 
-            // Construire la requête
             const query = Room.query()
 
-            if (type) {
-                query.where('type', 'ilike', `%${type}%`)
+            if (search) {
+                query
+                    .whereILike('type', `%${search}%`)
+                    .orWhereILike('location', `%${search}%`)
+                    .orWhereILike('occupancyStatus', `%${search}%`)
             }
 
-            if (occupancyStatus) {
-                query.where('occupancyStatus', occupancyStatus)
-            }
-
-            if (isAvailable !== undefined) {
-                query.where('isAvailable', isAvailable === 'true')
-            }
-
-            if (location) {
-                query.where('location', 'ilike', `%${location}%`)
-            }
-
-            const rooms = await query
+            const rooms = await query.orderBy('created_at', 'desc').paginate(page, limit)
 
             return response.ok({
                 status: 'success',
-                data: rooms,
                 message: 'Résultats de la recherche récupérés avec succès',
+                meta: rooms.toJSON().meta,
+                data: rooms.toJSON().data,
             })
         } catch (error) {
             console.error(error)

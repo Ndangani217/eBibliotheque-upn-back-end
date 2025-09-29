@@ -26,6 +26,11 @@ import { Role } from '#types/role'
 router
     .group(() => {
         // STUDENTS
+
+        router
+            .get('/students/search', [UsersController, 'searchStudents'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         router
             .get('/students', [UsersController, 'getStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
@@ -38,9 +43,6 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
         router
             .delete('/students/:id', [UsersController, 'deleteStudent'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-        router
-            .get('/students/search', [UsersController, 'searchStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
         // -------------------------
@@ -189,11 +191,13 @@ router
             .get('/', [ReservationsController, 'getAllReservations'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
-        router.get('/:id', [ReservationsController, 'getById'])
-        /*.middleware([
+        router
+            .get('/:id', [ReservationsController, 'getById'])
+            .middleware([
                 middleware.auth(),
                 middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-            ]*/
+            ])
+
         router
             .put('/:id', [ReservationsController, 'update'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
