@@ -372,19 +372,12 @@ export default class UsersController {
 
     // -------------------------
     // SEARCH STUDENTS
-    // -------------------------
     async searchStudents({ request, response }: HttpContext) {
         try {
-            const { name, email, facultyCode } = request.qs()
+            const { name } = request.qs()
 
             const query = User.query().where('role', Role.STUDENT).andWhere('is_verified', true)
 
-            // Recherche par email
-            if (email) {
-                query.whereILike('email', `%${email}%`)
-            }
-
-            // Recherche par prénom / postnom / nom
             if (name) {
                 query.where((subQuery) => {
                     subQuery
@@ -392,11 +385,6 @@ export default class UsersController {
                         .orWhereILike('name', `%${name}%`)
                         .orWhereILike('last_name', `%${name}%`)
                 })
-            }
-
-            // Filtrer par faculté
-            if (facultyCode) {
-                query.where('faculty_code', facultyCode)
             }
 
             const students = await query

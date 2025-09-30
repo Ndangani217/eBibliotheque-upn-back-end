@@ -29,8 +29,7 @@ router
 
         router
             .get('/students/search', [UsersController, 'searchStudents'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
         router
             .get('/students', [UsersController, 'getStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
