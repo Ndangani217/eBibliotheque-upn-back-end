@@ -192,6 +192,10 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
         router
+            .get('/my', [ReservationsController, 'getMyReservation'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
+
+        router
             .get('/:id', [ReservationsController, 'getById'])
             .middleware([
                 middleware.auth(),

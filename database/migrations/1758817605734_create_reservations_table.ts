@@ -26,6 +26,8 @@ export default class extends BaseSchema {
                 .defaultTo(ReservationStatus.EN_ATTENTE)
             table.text('observation_manager').nullable()
 
+            table.timestamp('approved_at').nullable()
+
             table.timestamp('created_at')
             table.timestamp('updated_at')
         })

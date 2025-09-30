@@ -1,4 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import { DateTime } from 'luxon'
 import User from '#models/user'
 import Reservation from '#models/reservation'
 import Room from '#models/room'
@@ -8,9 +9,13 @@ import { createReservationValidator, updateReservationValidator } from '#validat
 import { Status } from '#types/status'
 
 export default class ReservationsController {
+    /**
+     * Créer une réservation (étudiant uniquement)
+     */
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createReservationValidator)
+
             // Vérifier si l'étudiant existe et a le rôle STUDENT
             const student = await User.find(payload.studentId)
             if (!student || student.role !== Role.STUDENT) {
@@ -20,7 +25,7 @@ export default class ReservationsController {
                 })
             }
 
-            // Vérifier si l'étudiant a déjà une réservation en attente ou approuvée
+            // Vérifier si l’étudiant a déjà une réservation en attente ou approuvée
             const existingReservation = await Reservation.query()
                 .where('student_id', payload.studentId)
                 .whereIn('status', [ReservationStatus.EN_ATTENTE, ReservationStatus.APPROUVEE])
@@ -35,7 +40,7 @@ export default class ReservationsController {
                 })
             }
 
-            // Vérifier si la chambre existe et est disponible
+            // Vérifier si la chambre est dispo
             const room = await Room.find(payload.roomId)
             if (!room || !room.isAvailable || room.availableSpots <= 0) {
                 return response.badRequest({
@@ -65,7 +70,9 @@ export default class ReservationsController {
         }
     }
 
-    // Lister toutes les réservations
+    /**
+     * Lister toutes les réservations (pagination)
+     */
     async getAllReservations({ request, response }: HttpContext) {
         try {
             const page = request.input('page', 1)
@@ -79,12 +86,11 @@ export default class ReservationsController {
                 .orderBy('created_at', 'desc')
                 .paginate(page, limit)
 
-            const serialized = reservations.toJSON()
-
             return response.ok({
                 status: 'success',
-                message: 'Réservations paginées récupérées avec succès',
-                ...serialized,
+                message: 'Réservations récupérées avec succès',
+                data: reservations.toJSON().data,
+                meta: reservations.toJSON().meta,
             })
         } catch (error) {
             console.error(error)
@@ -95,18 +101,14 @@ export default class ReservationsController {
         }
     }
 
+    /**
+     * Récupérer les réservations par statut
+     */
     async getByStatus({ request, response }: HttpContext) {
         try {
             const status = request.input('status') as ReservationStatus
 
-            if (!status) {
-                return response.badRequest({
-                    status: 'error',
-                    message: 'Le paramètre "status" est requis',
-                })
-            }
-
-            if (!Object.values(ReservationStatus).includes(status)) {
+            if (!status || !Object.values(ReservationStatus).includes(status)) {
                 return response.badRequest({
                     status: 'error',
                     message: `Statut invalide. Valeurs possibles: ${Object.values(
@@ -122,8 +124,8 @@ export default class ReservationsController {
 
             return response.ok({
                 status: 'success',
-                data: reservations,
                 message: `Réservations avec le statut "${status}" récupérées avec succès`,
+                data: reservations,
             })
         } catch (error) {
             console.error(error)
@@ -134,7 +136,9 @@ export default class ReservationsController {
         }
     }
 
-    // Détails d’une réservation
+    /**
+     * Récupérer une réservation par ID
+     */
     async getById({ params, response, auth }: HttpContext) {
         try {
             const reservation = await Reservation.query()
@@ -152,6 +156,7 @@ export default class ReservationsController {
 
             return response.ok({
                 status: 'success',
+                message: 'Réservation récupérée avec succès',
                 data: reservation,
             })
         } catch (error) {
@@ -162,13 +167,46 @@ export default class ReservationsController {
         }
     }
 
-    // Mettre à jour une réservation
+    /**
+     * Récupérer la réservation de l’étudiant connecté
+     */
+    async getMyReservation({ auth, response }: HttpContext) {
+        try {
+            if (!auth.user || auth.user.role !== Role.STUDENT) {
+                return response.forbidden({
+                    status: 'error',
+                    message: 'Accès réservé aux étudiants',
+                })
+            }
+
+            const reservation = await Reservation.query()
+                .where('student_id', auth.user.id)
+                .preload('room')
+                .orderBy('created_at', 'desc')
+                .first()
+
+            return response.ok({
+                status: 'success',
+                message: reservation ? 'Réservation trouvée' : 'Aucune réservation trouvée',
+                data: reservation,
+            })
+        } catch (error) {
+            console.error(error)
+            return response.internalServerError({
+                status: 'error',
+                message: 'Erreur lors de la récupération de la réservation',
+            })
+        }
+    }
+
+    /**
+     * Mettre à jour une réservation
+     */
     async update({ params, request, auth, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(updateReservationValidator)
             const reservation = await Reservation.findOrFail(params.id)
 
-            // Vérification ownership si c’est un étudiant
             if (auth.user?.role === Role.STUDENT && reservation.studentId !== auth.user.id) {
                 return response.forbidden({
                     status: 'error',
@@ -193,7 +231,9 @@ export default class ReservationsController {
         }
     }
 
-    // Approuver une réservation
+    /**
+     * Approuver une réservation
+     */
     async approve({ params, response }: HttpContext) {
         try {
             const reservation = await Reservation.query()
@@ -202,7 +242,6 @@ export default class ReservationsController {
                 .preload('room')
                 .firstOrFail()
 
-            // Vérifier si déjà approuvée
             if (reservation.status === ReservationStatus.APPROUVEE) {
                 return response.badRequest({
                     status: 'error',
@@ -210,7 +249,6 @@ export default class ReservationsController {
                 })
             }
 
-            // Vérifier si la chambre existe et a des places
             const room = await Room.find(reservation.roomId)
             if (!room || !room.isAvailable || room.availableSpots <= 0) {
                 return response.badRequest({
@@ -219,7 +257,6 @@ export default class ReservationsController {
                 })
             }
 
-            // Vérifier rôle étudiant
             const student = await User.find(reservation.studentId)
             if (!student || student.role !== Role.STUDENT) {
                 return response.badRequest({
@@ -228,13 +265,12 @@ export default class ReservationsController {
                 })
             }
 
-            // Attacher l’étudiant à la chambre
             await room.related('students').attach([student.id])
             room.availableSpots -= 1
             await room.save()
 
-            // Mettre à jour le statut
             reservation.status = ReservationStatus.APPROUVEE
+            reservation.approvedAt = DateTime.now()
             await reservation.save()
 
             return response.ok({
@@ -251,6 +287,9 @@ export default class ReservationsController {
         }
     }
 
+    /**
+     * Refuser une réservation
+     */
     async reject({ params, request, response }: HttpContext) {
         try {
             const { observationManager } = request.only(['observationManager'])
@@ -274,7 +313,9 @@ export default class ReservationsController {
         }
     }
 
-    // Supprimer une réservation
+    /**
+     * Supprimer une réservation
+     */
     async delete({ params, response }: HttpContext) {
         try {
             const reservation = await Reservation.findOrFail(params.id)
@@ -292,6 +333,9 @@ export default class ReservationsController {
         }
     }
 
+    /**
+     * Annuler une réservation approuvée
+     */
     async cancel({ params, response, auth }: HttpContext) {
         try {
             const reservation = await Reservation.query()
@@ -314,7 +358,6 @@ export default class ReservationsController {
                 })
             }
 
-            // Libérer la chambre
             const room = reservation.room
             if (room) {
                 await room.related('students').detach([reservation.studentId])
@@ -323,6 +366,7 @@ export default class ReservationsController {
                 room.occupancyStatus = Status.DISPONIBLE
                 await room.save()
             }
+
             reservation.status = ReservationStatus.ANNULEE
             await reservation.save()
 
@@ -340,14 +384,14 @@ export default class ReservationsController {
         }
     }
 
-    //ajouter dans ReservationsController
+    /**
+     * Rechercher par nom d’étudiant
+     */
     async searchByStudentName({ request, response }: HttpContext) {
         try {
             const page = request.input('page', 1)
             const limit = request.input('limit', 10)
             const search = request.input('search', '').trim()
-            console.log('Search query:', search)
-            console.log('Page:', page, 'Limit:', limit)
 
             const query = Reservation.query()
                 .preload('student')
@@ -364,12 +408,11 @@ export default class ReservationsController {
 
             const reservations = await query.paginate(page, limit)
 
-            const serialized = reservations.toJSON()
-
             return response.ok({
                 status: 'success',
                 message: 'Résultats de recherche',
-                ...serialized,
+                data: reservations.toJSON().data,
+                meta: reservations.toJSON().meta,
             })
         } catch (error) {
             console.error(error)

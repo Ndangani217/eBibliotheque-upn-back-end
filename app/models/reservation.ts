@@ -25,6 +25,9 @@ export default class Reservation extends BaseModel {
     })
     declare room: BelongsTo<typeof Room>
 
+    @column.dateTime({ columnName: 'approved_at' })
+    declare approvedAt: DateTime | null
+
     @column()
     declare preferredType: string | null
 
