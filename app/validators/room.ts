@@ -1,5 +1,5 @@
 import vine from '@vinejs/vine'
-import { Status } from '#types/status'
+import { Status } from '#types/roomStatus'
 import { Gender } from '#types/gender'
 
 export const createRoomValidator = vine.compile(

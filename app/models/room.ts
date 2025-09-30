@@ -2,7 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
 import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
-import { Status } from '#types/status'
+import { Status } from '#types/roomStatus'
 export default class Room extends BaseModel {
     @column({ isPrimary: true })
     declare id: number

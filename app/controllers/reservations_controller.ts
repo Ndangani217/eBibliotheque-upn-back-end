@@ -6,7 +6,7 @@ import Room from '#models/room'
 import { Role } from '#types/role'
 import { ReservationStatus } from '#types/reservationStatus'
 import { createReservationValidator, updateReservationValidator } from '#validators/reservation'
-import { Status } from '#types/status'
+import { Status } from '#types/roomStatus'
 
 export default class ReservationsController {
     /**

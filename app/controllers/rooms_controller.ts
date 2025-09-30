@@ -7,7 +7,7 @@ import {
     transferStudentValidator,
 } from '#validators/room'
 import { assignStudentValidator } from '#validators/user'
-import { Status } from '#types/status'
+import { Status } from '#types/roomStatus'
 import { Role } from '#types/role'
 
 export default class RoomsController {
