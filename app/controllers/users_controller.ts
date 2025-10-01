@@ -13,27 +13,7 @@ import {
     forgotPasswordValidator,
     resetPasswordValidator,
 } from '#validators/user'
-
-// -------------------------
-// Helper centralisé pour erreurs
-// -------------------------
-function handleError(response: HttpContext['response'], error: any, defaultMessage: string) {
-    console.error(error)
-
-    // Erreurs de validation Vine
-    if (error.messages) {
-        return response.unprocessableEntity({
-            status: 'error',
-            message: 'Erreur de validation',
-            errors: error.messages,
-        })
-    }
-
-    return response.internalServerError({
-        status: 'error',
-        message: error.message || defaultMessage,
-    })
-}
+import { HandleError as handleError } from '#helpers/handleError'
 
 export default class UsersController {
     // -------------------------
