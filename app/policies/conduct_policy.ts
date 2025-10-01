@@ -3,6 +3,7 @@ import Conduct from '#models/conduct'
 import { BasePolicy } from '@adonisjs/bouncer'
 import type { AuthorizerResponse } from '@adonisjs/bouncer/types'
 import { Role } from '#types/role'
+import { ConductStatus } from '#types/conduct'
 
 export default class ConductPolicy extends BasePolicy {
     /**
@@ -15,7 +16,7 @@ export default class ConductPolicy extends BasePolicy {
     /**
      * Seul ADMIN et MANAGER peuvent modifier
      */
-    async update(user: User, conduct: Conduct): Promise<AuthorizerResponse> {
+    async update(user: User): Promise<AuthorizerResponse> {
         return [Role.ADMIN, Role.MANAGER].includes(user.role)
     }
 
@@ -40,6 +41,9 @@ export default class ConductPolicy extends BasePolicy {
      * (Optionnel) Autoriser la clôture si pas déjà clos
      */
     async close(user: User, conduct: Conduct): Promise<AuthorizerResponse> {
-        return [Role.ADMIN, Role.MANAGER].includes(user.role) && conduct.status !== 'clos'
+        return (
+            [Role.ADMIN, Role.MANAGER].includes(user.role) &&
+            conduct.status !== ConductStatus.CLOSED
+        )
     }
 }
