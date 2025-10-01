@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Subscription from '#models/subscription'
+import { PaymentStatus } from '#types/paymentStatus'
 
 export default class Payment extends BaseModel {
     @column({ isPrimary: true })
@@ -20,7 +21,7 @@ export default class Payment extends BaseModel {
     declare date: DateTime
 
     @column()
-    declare status: 'validé' | 'en attente' | 'rejeté'
+    declare status: PaymentStatus
 
     @belongsTo(() => Subscription)
     declare subscription: BelongsTo<typeof Subscription>

@@ -4,6 +4,7 @@ import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Student from '#models/user'
 import Room from '#models/room'
 import Payment from '#models/payment'
+import { SubscriptionStatus } from '#types/subscriptionStatus'
 
 export default class Subscription extends BaseModel {
     @column({ isPrimary: true })
@@ -22,7 +23,7 @@ export default class Subscription extends BaseModel {
     declare endDate: DateTime
 
     @column()
-    declare status: 'actif' | 'expiré' | 'suspendu'
+    declare status: SubscriptionStatus
 
     @column()
     declare reference: string
