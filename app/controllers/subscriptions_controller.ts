@@ -7,7 +7,7 @@ import { getExpiryRange } from '#helpers/dateRange'
 import type { Period } from '#types/period'
 
 export default class SubscriptionsController {
-    // 📌 1. Récupérer tous les abonnements avec leurs relations (student, room, payments)
+    // Récupérer tous les abonnements avec leurs relations (student, room, payments)
     async getAllSubscriptions({ response }: HttpContext) {
         try {
             const subscriptions = await Subscription.query()
@@ -24,7 +24,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 2. Récupérer les détails d’un abonnement spécifique par ID
+    // Récupérer les détails d’un abonnement spécifique par ID
     async getByIdSubscription({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -44,7 +44,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 3. Créer un nouvel abonnement (valide les données puis insère en DB)
+    // Créer un nouvel abonnement (valide les données puis insère en DB)
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createSubscriptionValidator)
@@ -60,7 +60,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 4. Mettre à jour un abonnement existant
+    //  Mettre à jour un abonnement existant
     async update({ params, request, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -79,7 +79,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 5. Supprimer un abonnement existant par ID
+    // Supprimer un abonnement existant par ID
     async delete({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -95,7 +95,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 6. Récupérer tous les paiements liés à un abonnement donné
+    // Récupérer tous les paiements liés à un abonnement donné
     async payments({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -113,7 +113,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 7. Récupérer les abonnements expirant dans un délai défini (jour/semaine/mois/année)
+    // Récupérer les abonnements expirant dans un délai défini (jour/semaine/mois/année)
     async expiring({ request, response }: HttpContext) {
         try {
             const period = request.input('period', 'day') as Period
@@ -151,7 +151,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 8. Récupérer les abonnements selon leur statut (actif, expiré, suspendu)
+    // Récupérer les abonnements selon leur statut (actif, expiré, suspendu)
     async byStatus({ request, response }: HttpContext) {
         try {
             const status = request.input('status') // ?status=actif
@@ -190,7 +190,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // 📌 9. Calculer le temps restant d’un abonnement (jours, semaines, mois)
+    // Calculer le temps restant d’un abonnement (jours, semaines, mois)
     async remainingTime({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()

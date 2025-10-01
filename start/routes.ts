@@ -22,6 +22,8 @@ const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
 const ReservationsController = () => import('#controllers/reservations_controller')
 const PaymentsController = () => import('#controllers/payments_controller')
+const ConductsController = () => import('#controllers/conducts_controller')
+const SubscriptionsController = () => import('#controllers/subscriptions_controller')
 
 import { Role } from '#types/role'
 
@@ -233,30 +235,155 @@ router
 
 router
     .group(() => {
-        router.get('/payments', [PaymentsController, 'getAllPayments'])
+        router
+            .get('/', [PaymentsController, 'getAllPayments'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
-        router.get('/payments/:id', [PaymentsController, 'getById'])
+        router
+            .get('/:id', [PaymentsController, 'getById'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.post('/payments', [PaymentsController, 'create'])
+        router
+            .post('/', [PaymentsController, 'create'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
-        router.put('/payments/:id', [PaymentsController, 'update'])
+        router
+            .put('/:id', [PaymentsController, 'update'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
 
-        router.delete('/payments/:id', [PaymentsController, 'destroy'])
+        router
+            .delete('/:id', [PaymentsController, 'destroy'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
+        router
+            .get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
+        router
+            .get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.patch('/payments/:id/status', [PaymentsController, 'updateStatus'])
+        router
+            .patch('/:id/status', [PaymentsController, 'updateStatus'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.get('/payments/reference/:reference', [PaymentsController, 'searchByReference'])
+        router
+            .get('/reference/:reference', [PaymentsController, 'searchByReference'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.get('/students/:studentId/payments/period', [PaymentsController, 'byStudentPeriod'])
+        router
+            .get('/students/:studentId/payments/period', [PaymentsController, 'byStudentPeriod'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
 
-        router.get('/students/:studentId/payments/summary', [
-            PaymentsController,
-            'summaryByStudentPeriod',
-        ])
-        router.get('/payments/dashboard', [PaymentsController, 'dashboard'])
+        router
+            .get('/students/:studentId/payments/summary', [
+                PaymentsController,
+                'summaryByStudentPeriod',
+            ])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
+        router
+            .get('/dashboard', [PaymentsController, 'dashboard'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
     })
-    .prefix('/api')
+    .prefix('/payments')
+
+router
+    .group(() => {
+        router.get('/', [ConductsController, 'index']).use(middleware.auth())
+        router.get('/:id', [ConductsController, 'show']).use(middleware.auth())
+        router.post('/', [ConductsController, 'store']).use([middleware.auth()])
+        router.put('/:id', [ConductsController, 'update']).use([middleware.auth()])
+        router.delete('/:id', [ConductsController, 'destroy']).use([middleware.auth()])
+
+        router.get('/student/:studentId', [ConductsController, 'byStudent']).use(middleware.auth())
+        router
+            .get('/student/:studentId/stats', [ConductsController, 'statsByStudent'])
+            .use(middleware.auth())
+
+        router.get('/status', [ConductsController, 'byStatus']).use(middleware.auth())
+        router.put('/:id/close', [ConductsController, 'close']).use(middleware.auth())
+    })
+    .prefix('/conducts')
+
+router
+    .group(() => {
+        //  Liste de tous les abonnements
+        router
+            .get('/', [SubscriptionsController, 'getAllSubscriptions'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        // Détails d’un abonnement
+        router
+            .get('/:id', [SubscriptionsController, 'getByIdSubscription'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
+        // Créer un abonnement
+        router
+            .post('/', [SubscriptionsController, 'create'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        // Mettre à jour un abonnement
+        router
+            .put('/:id', [SubscriptionsController, 'update'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        // Supprimer un abonnement
+        router
+            .delete('/:id', [SubscriptionsController, 'delete'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
+        // Récupérer les paiements d’un abonnement
+        router
+            .get('/:id/payments', [SubscriptionsController, 'payments'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
+        // Abonnements expirant dans une période
+        router
+            .get('/expiring/list', [SubscriptionsController, 'expiring'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        // Abonnements par statut
+        router
+            .get('/status/list', [SubscriptionsController, 'byStatus'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        // Temps restant d’un abonnement
+        router
+            .get('/:id/remaining', [SubscriptionsController, 'remainingTime'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+    })
+    .prefix('/subscriptions')

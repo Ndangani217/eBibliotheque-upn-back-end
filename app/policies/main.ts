@@ -12,4 +12,6 @@
 |
 */
 
-export const policies = {}
+export const policies = {
+  ConductPolicy: () => import('#policies/conduct_policy')
+}
