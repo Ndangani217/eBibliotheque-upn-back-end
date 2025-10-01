@@ -17,3 +17,20 @@ export function getRange(period: Period, zone = 'Africa/Kinshasa') {
             throw new Error(`Période invalide: ${period}`)
     }
 }
+
+export function getExpiryRange(period: Period, offset = 1, zone = 'Africa/Kinshasa') {
+    const now = DateTime.now().setZone(zone)
+
+    switch (period) {
+        case Period.Day:
+            return { start: now, end: now.plus({ days: offset }) }
+        case Period.Week:
+            return { start: now, end: now.plus({ weeks: offset }) }
+        case Period.Month:
+            return { start: now, end: now.plus({ months: offset }) }
+        case Period.Year:
+            return { start: now, end: now.plus({ years: offset }) }
+        default:
+            throw new Error(`Période invalide: ${period}`)
+    }
+}

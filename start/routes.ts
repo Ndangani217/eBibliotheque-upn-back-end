@@ -21,6 +21,8 @@ import { middleware } from './kernel.js'
 const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
 const ReservationsController = () => import('#controllers/reservations_controller')
+const PaymentsController = () => import('#controllers/payments_controller')
+
 import { Role } from '#types/role'
 
 router
@@ -228,3 +230,33 @@ router
             ])
     })
     .prefix('/reservations')
+
+router
+    .group(() => {
+        router.get('/payments', [PaymentsController, 'getAllPayments'])
+
+        router.get('/payments/:id', [PaymentsController, 'getById'])
+
+        router.post('/payments', [PaymentsController, 'create'])
+
+        router.put('/payments/:id', [PaymentsController, 'update'])
+
+        router.delete('/payments/:id', [PaymentsController, 'destroy'])
+
+        router.get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
+
+        router.get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
+
+        router.patch('/payments/:id/status', [PaymentsController, 'updateStatus'])
+
+        router.get('/payments/reference/:reference', [PaymentsController, 'searchByReference'])
+
+        router.get('/students/:studentId/payments/period', [PaymentsController, 'byStudentPeriod'])
+
+        router.get('/students/:studentId/payments/summary', [
+            PaymentsController,
+            'summaryByStudentPeriod',
+        ])
+        router.get('/payments/dashboard', [PaymentsController, 'dashboard'])
+    })
+    .prefix('/api')
