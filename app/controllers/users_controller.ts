@@ -9,11 +9,15 @@ import {
     createStudentValidator,
     updateStudentValidator,
     createManagerValidator,
+    updateManagerValidator,
+    createAdminValidator,
     updateAdminValidator,
     forgotPasswordValidator,
     resetPasswordValidator,
 } from '#validators/user'
 import { HandleError as handleError } from '#helpers/handleError'
+import UserSessionService from '#services/user_session'
+import UserSession from '#models/user_session'
 
 export default class UsersController {
     // -------------------------
@@ -30,6 +34,7 @@ export default class UsersController {
 
             const user = await User.verifyCredentials(email, password)
             const token = await auth.use('api').createToken(user)
+            await UserSessionService.start(user, { request } as HttpContext)
 
             return response.ok({
                 status: 'success',
@@ -38,17 +43,17 @@ export default class UsersController {
                     token,
                     user: {
                         id: user.id,
-                        email: user?.email,
-                        role: user?.role,
-                        isVerified: user?.isVerified,
-                        firstName: user?.firstName,
-                        name: user?.name,
-                        lastName: user?.lastName,
-                        phoneNumber: user?.phoneNumber,
-                        facultyCode: user?.facultyCode,
-                        department: user?.department,
-                        promotion: user?.promotion,
-                        photoUrl: user?.photoUrl,
+                        email: user.email,
+                        role: user.role,
+                        isVerified: user.isVerified,
+                        firstName: user.firstName,
+                        name: user.name,
+                        lastName: user.lastName,
+                        phoneNumber: user.phoneNumber,
+                        facultyCode: user.facultyCode,
+                        department: user.department,
+                        promotion: user.promotion,
+                        photoUrl: user.photoUrl,
                     },
                 },
             })
@@ -59,7 +64,14 @@ export default class UsersController {
 
     async logout({ auth, response }: HttpContext) {
         try {
+            const user = auth.user
+            if (!user) {
+                return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+            }
+
             await auth.use('api').invalidateToken()
+            await UserSessionService.end(user.id)
+
             return response.ok({ status: 'success', message: 'Déconnexion réussie' })
         } catch (error) {
             return handleError(response, error, 'Impossible de se déconnecter')
@@ -74,27 +86,16 @@ export default class UsersController {
 
             return response.ok({
                 status: 'success',
-                data: {
-                    user: {
-                        id: auth.user.id,
-                        email: auth.user?.email,
-                        role: auth.user?.role,
-                        isVerified: auth.user?.isVerified,
-                        firstName: auth.user?.firstName,
-                        name: auth.user?.name,
-                        lastName: auth.user?.lastName,
-                        phoneNumber: auth.user?.phoneNumber,
-                        facultyCode: auth.user?.facultyCode,
-                        department: auth.user?.department,
-                        promotion: auth.user?.promotion,
-                        photoUrl: auth.user?.photoUrl,
-                    },
-                },
+                data: { user: auth.user },
             })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer le profil')
         }
     }
+
+    // -------------------------
+    // GET BY ID
+    // -------------------------
     async getStudentById({ params, response }: HttpContext) {
         try {
             const student = await User.query()
@@ -103,15 +104,15 @@ export default class UsersController {
                 .andWhere('is_verified', true)
                 .first()
 
-            if (!student) {
+            if (!student)
                 return response.notFound({ status: 'error', message: 'Étudiant introuvable' })
-            }
 
             return response.ok({ status: 'success', data: student })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer l’étudiant')
         }
     }
+
     async getManagerById({ params, response }: HttpContext) {
         try {
             const manager = await User.query()
@@ -120,9 +121,8 @@ export default class UsersController {
                 .andWhere('is_verified', true)
                 .first()
 
-            if (!manager) {
+            if (!manager)
                 return response.notFound({ status: 'error', message: 'Manager introuvable' })
-            }
 
             return response.ok({ status: 'success', data: manager })
         } catch (error) {
@@ -138,9 +138,7 @@ export default class UsersController {
                 .andWhere('is_verified', true)
                 .first()
 
-            if (!admin) {
-                return response.notFound({ status: 'error', message: 'Admin introuvable' })
-            }
+            if (!admin) return response.notFound({ status: 'error', message: 'Admin introuvable' })
 
             return response.ok({ status: 'success', data: admin })
         } catch (error) {
@@ -149,14 +147,13 @@ export default class UsersController {
     }
 
     // -------------------------
-    // GET USERS
+    // GET LIST
     // -------------------------
     async getStudents({ response }: HttpContext) {
         try {
             const students = await User.query()
                 .where('role', Role.STUDENT)
                 .andWhere('is_verified', true)
-
             return response.ok({ status: 'success', data: students })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer les étudiants')
@@ -168,8 +165,28 @@ export default class UsersController {
             const managers = await User.query()
                 .where('role', Role.MANAGER)
                 .andWhere('is_verified', true)
+                .preload('sessions', (q) => q.orderBy('login_at', 'desc').limit(1))
 
-            return response.ok({ status: 'success', data: managers })
+            const data = managers.map((m) => {
+                const s = m.sessions?.[0]
+                const online = !!s && s.logoutAt === null
+                const lastConnection = s ? (s.logoutAt ?? s.loginAt) : null
+
+                const base = m.serialize()
+                delete (base as any).sessions
+
+                return {
+                    ...base,
+                    online,
+                    lastConnection,
+                }
+            })
+
+            return response.ok({
+                status: 'success',
+                message: 'Managers récupérés avec statut',
+                data,
+            })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer les managers')
         }
@@ -180,7 +197,6 @@ export default class UsersController {
             const admins = await User.query()
                 .where('role', Role.ADMIN)
                 .andWhere('is_verified', true)
-
             return response.ok({ status: 'success', data: admins })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer les admins')
@@ -193,11 +209,7 @@ export default class UsersController {
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
-            const user = await User.create({
-                ...payload,
-                role: Role.STUDENT,
-                isVerified: false,
-            })
+            const user = await User.create({ ...payload, role: Role.STUDENT, isVerified: false })
 
             return response.created({
                 status: 'success',
@@ -212,12 +224,7 @@ export default class UsersController {
     async createManager({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createManagerValidator)
-
-            const user = await User.create({
-                ...payload,
-                role: Role.MANAGER,
-                isVerified: false,
-            })
+            const user = await User.create({ ...payload, role: Role.MANAGER, isVerified: false })
 
             return response.created({
                 status: 'success',
@@ -231,13 +238,8 @@ export default class UsersController {
 
     async createAdmin({ request, response }: HttpContext) {
         try {
-            const payload = await request.validateUsing(createManagerValidator)
-
-            const user = await User.create({
-                ...payload,
-                role: Role.ADMIN,
-                isVerified: false,
-            })
+            const payload = await request.validateUsing(createAdminValidator)
+            const user = await User.create({ ...payload, role: Role.ADMIN, isVerified: false })
 
             return response.created({
                 status: 'success',
@@ -286,7 +288,6 @@ export default class UsersController {
                 .where('id', params.id)
                 .andWhere('role', Role.STUDENT)
                 .first()
-
             if (!user)
                 return response.notFound({ status: 'error', message: 'Étudiant introuvable' })
 
@@ -310,10 +311,9 @@ export default class UsersController {
                 .where('id', params.id)
                 .andWhere('role', Role.MANAGER)
                 .first()
-
             if (!user) return response.notFound({ status: 'error', message: 'Manager introuvable' })
 
-            const payload = await request.validateUsing(updateAdminValidator)
+            const payload = await request.validateUsing(updateManagerValidator)
             user.merge(payload)
             await user.save()
 
@@ -333,7 +333,6 @@ export default class UsersController {
                 .where('id', params.id)
                 .andWhere('role', Role.ADMIN)
                 .first()
-
             if (!user) return response.notFound({ status: 'error', message: 'Admin introuvable' })
 
             const payload = await request.validateUsing(updateAdminValidator)
@@ -351,11 +350,11 @@ export default class UsersController {
     }
 
     // -------------------------
-    // SEARCH STUDENTS
+    // SEARCH USERS
+    // -------------------------
     async searchStudents({ request, response }: HttpContext) {
         try {
             const { name } = request.qs()
-
             const query = User.query().where('role', Role.STUDENT).andWhere('is_verified', true)
 
             if (name) {
@@ -368,7 +367,6 @@ export default class UsersController {
             }
 
             const students = await query
-
             return response.ok({
                 status: 'success',
                 message: 'Résultats de recherche des étudiants récupérés',
@@ -382,7 +380,6 @@ export default class UsersController {
     async searchManagers({ request, response }: HttpContext) {
         try {
             const { name, email } = request.qs()
-
             const query = User.query().where('role', Role.MANAGER).andWhere('is_verified', true)
 
             if (email) query.whereILike('email', `%${email}%`)
@@ -393,7 +390,6 @@ export default class UsersController {
             }
 
             const managers = await query
-
             return response.ok({
                 status: 'success',
                 message: 'Résultats de recherche des managers récupérés',
@@ -407,7 +403,6 @@ export default class UsersController {
     async searchAdmins({ request, response }: HttpContext) {
         try {
             const { name, email } = request.qs()
-
             const query = User.query().where('role', Role.ADMIN).andWhere('is_verified', true)
 
             if (email) query.whereILike('email', `%${email}%`)
@@ -418,7 +413,6 @@ export default class UsersController {
             }
 
             const admins = await query
-
             return response.ok({
                 status: 'success',
                 message: 'Résultats de recherche des admins récupérés',
@@ -430,19 +424,16 @@ export default class UsersController {
     }
 
     // -------------------------
-    // DELETE USER
+    // DELETE USERS
     // -------------------------
-
     async deleteStudent({ params, response }: HttpContext) {
         try {
             const student = await User.query()
                 .where('id', params.id)
                 .andWhere('role', Role.STUDENT)
                 .first()
-
-            if (!student) {
+            if (!student)
                 return response.notFound({ status: 'error', message: 'Étudiant introuvable' })
-            }
 
             await student.delete()
             return response.ok({ status: 'success', message: 'Étudiant supprimé avec succès' })
@@ -453,19 +444,17 @@ export default class UsersController {
 
     async deleteManager({ params, response }: HttpContext) {
         try {
-            const admin = await User.query()
+            const manager = await User.query()
                 .where('id', params.id)
                 .andWhere('role', Role.MANAGER)
                 .first()
-
-            if (!admin) {
+            if (!manager)
                 return response.notFound({ status: 'error', message: 'Manager introuvable' })
-            }
 
-            await admin.delete()
+            await manager.delete()
             return response.ok({ status: 'success', message: 'Manager supprimé avec succès' })
         } catch (error) {
-            return handleError(response, error, 'Impossible de supprimer le Manager')
+            return handleError(response, error, 'Impossible de supprimer le manager')
         }
     }
 
@@ -475,10 +464,7 @@ export default class UsersController {
                 .where('id', params.id)
                 .andWhere('role', Role.ADMIN)
                 .first()
-
-            if (!admin) {
-                return response.notFound({ status: 'error', message: 'Admin introuvable' })
-            }
+            if (!admin) return response.notFound({ status: 'error', message: 'Admin introuvable' })
 
             await admin.delete()
             return response.ok({ status: 'success', message: 'Admin supprimé avec succès' })
@@ -487,10 +473,9 @@ export default class UsersController {
         }
     }
 
-    /**
-     * POST /users/forgot-password
-     * Crée un token de reset et envoie (ou retourne) l’info
-     */
+    // -------------------------
+    // PASSWORD RESET
+    // -------------------------
     async forgotPassword({ request, response }: HttpContext) {
         try {
             const { email } = await request.validateUsing(forgotPasswordValidator)
@@ -502,6 +487,7 @@ export default class UsersController {
                         'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
                 })
             }
+
             const rawToken = crypto.randomBytes(32).toString('hex')
             const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
 
@@ -511,33 +497,16 @@ export default class UsersController {
 
             const resetUrl = `${process.env.FRONT_URL}/confirm-password/${rawToken}`
 
-            /*
-            await Mail.send((message) => {
-                message
-                .to(user.email)
-                .from('no-reply@monapp.com')
-                .subject('Réinitialisation de votre mot de passe')
-                .htmlView('emails/confirm-password', { resetUrl })
-            })
-            */
             return response.ok({
                 status: 'success',
                 message: 'Un email de réinitialisation a été envoyé',
-                data: {
-                    resetUrl, // pratique pour dev front
-                },
+                data: { resetUrl }, // utile en dev
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Impossible d’initier la réinitialisation',
-            })
+            return handleError(response, error, 'Impossible d’initier la réinitialisation')
         }
     }
-    // -------------------------
-    // Réinitialiser mot de passe
-    // -------------------------
+
     async resetPassword({ params, request, response }: HttpContext) {
         try {
             const { password } = await request.validateUsing(resetPasswordValidator)
@@ -563,6 +532,27 @@ export default class UsersController {
             })
         } catch (error) {
             return handleError(response, error, 'Impossible de réinitialiser le mot de passe')
+        }
+    }
+
+    async sessionsOfDay({ params, request, response }: HttpContext) {
+        try {
+            const userId = Number(params.id)
+            const dateStr = request.input('date') // 'YYYY-MM-DD'
+            const day = dateStr ? DateTime.fromISO(dateStr) : DateTime.now()
+
+            const sessions = await UserSession.query()
+                .where('user_id', userId)
+                .whereBetween('login_at', [day.startOf('day').toSQL()!, day.endOf('day').toSQL()!])
+                .orderBy('login_at', 'asc')
+
+            return response.ok({
+                status: 'success',
+                message: 'Sessions de la journée récupérées',
+                data: sessions,
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de récupérer les sessions')
         }
     }
 }

@@ -1,12 +1,13 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import { Role } from '#types/role'
 import Faculty from '#models/faculty'
+import UserSession from '#models/user_session'
 import { Promotion } from '#types/promotion'
 import { Gender } from '#types/gender'
 
@@ -69,6 +70,12 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
     @column({ columnName: 'reset_token', serializeAs: null })
     declare resetToken: string | null
+
+    @hasMany(() => UserSession)
+    declare sessions: HasMany<typeof UserSession>
+
+    @column.dateTime({ columnName: 'last_seen_at', serializeAs: 'lastSeenAt' })
+    declare lastSeenAt: DateTime | null
 
     @column.dateTime({ columnName: 'reset_expires', serializeAs: null })
     declare resetExpires: DateTime | null

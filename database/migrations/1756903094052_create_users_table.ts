@@ -31,6 +31,8 @@ export default class extends BaseSchema {
             table.enum('role', Object.values(Role)).notNullable()
             table.boolean('is_verified').notNullable().defaultTo(false)
 
+            table.timestamp('last_seen_at', { useTz: true }).nullable()
+
             table.timestamp('created_at', { useTz: true }).notNullable()
             table.timestamp('updated_at', { useTz: true }).nullable()
 

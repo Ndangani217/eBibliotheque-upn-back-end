@@ -3,7 +3,6 @@ import vine from '@vinejs/vine'
 import { Gender } from '#types/gender'
 import { Faculty } from '#types/faculty'
 import { Promotion } from '#types/promotion'
-import { Role } from '#types/role'
 
 /**
  * -------------------------
@@ -80,26 +79,47 @@ export const updateStudentValidator = vine.compile(
 
 /**
  * -------------------------
- * CREATE ADMIN VALIDATOR
+ * ADMIN & MANAGER VALIDATOR
  * -------------------------
  */
-export const createManagerValidator = vine.compile(
+// Schéma de base réutilisable
+const baseUserSchema = {
+    email: vine.string().trim().email().unique({ table: 'users', column: 'email' }),
+    firstName: vine.string().minLength(3),
+    name: vine.string().minLength(3),
+    lastName: vine.string().minLength(3),
+    phoneNumber: vine
+        .string()
+        .regex(/^(?:\+243|0)[1-9]\d{8}$/)
+        .optional(),
+}
+
+/**
+ * -------------------------
+ * CREATE MANAGER VALIDATOR
+ * -------------------------
+ */
+export const createManagerValidator = vine.compile(vine.object(baseUserSchema))
+export const updateManagerValidator = vine.compile(
     vine.object({
-        email: vine.string().trim().email().unique({ table: 'users', column: 'email' }),
-        firstName: vine.string().minLength(3),
-        name: vine.string().minLength(3),
-        lastName: vine.string().minLength(3),
-        role: vine.enum([Role.ADMIN, Role.MANAGER]),
+        ...baseUserSchema,
+        email: vine.string().trim().email().unique({ table: 'users', column: 'email' }).optional(),
+        firstName: vine.string().minLength(3).optional(),
+        name: vine.string().minLength(3).optional(),
+        lastName: vine.string().minLength(3).optional(),
     }),
 )
 
 /**
  * -------------------------
- * UPDATE ADMIN VALIDATOR
+ * CREATE ADMIN VALIDATOR
  * -------------------------
  */
+export const createAdminValidator = vine.compile(vine.object(baseUserSchema))
 export const updateAdminValidator = vine.compile(
     vine.object({
+        ...baseUserSchema,
+        email: vine.string().trim().email().unique({ table: 'users', column: 'email' }).optional(),
         firstName: vine.string().minLength(3).optional(),
         name: vine.string().minLength(3).optional(),
         lastName: vine.string().minLength(3).optional(),

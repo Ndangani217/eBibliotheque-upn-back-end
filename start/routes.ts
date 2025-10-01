@@ -17,7 +17,7 @@ import router from '@adonisjs/core/services/router'
 | The routes file is used for defining the HTTP routes.
 |
 */
-import { middleware } from './kernel.js'
+import { namedMiddleware as middleware } from './kernel.js'
 const UsersController = () => import('#controllers/users_controller')
 const RoomsController = () => import('#controllers/rooms_controller')
 const ReservationsController = () => import('#controllers/reservations_controller')
@@ -26,24 +26,35 @@ const ConductsController = () => import('#controllers/conducts_controller')
 const SubscriptionsController = () => import('#controllers/subscriptions_controller')
 
 import { Role } from '#types/role'
-
 router
     .group(() => {
+        // -------------------------
         // STUDENTS
-
+        // -------------------------
         router
             .get('/students/search', [UsersController, 'searchStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
         router
             .get('/students', [UsersController, 'getStudents'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
         router
             .get('/students/:id', [UsersController, 'getStudentById'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+            ])
+
         router.post('/students', [UsersController, 'createStudent'])
+
         router
             .put('/students/:id', [UsersController, 'updateStudent'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.STUDENT])])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.STUDENT, Role.ADMIN, Role.MANAGER]),
+            ])
+
         router
             .delete('/students/:id', [UsersController, 'deleteStudent'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
@@ -54,15 +65,23 @@ router
         router
             .get('/admins', [UsersController, 'getAdmins'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-        router.get('/admins/:id', [UsersController, 'getAdminById'])
-        router.post('/admins', [UsersController, 'createAdmin'])
+
+        router
+            .get('/admins/:id', [UsersController, 'getAdminById'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
+        router
+            .post('/admins', [UsersController, 'createAdmin'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
         router
             .put('/admins/:id', [UsersController, 'updateAdmin'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         router
             .delete('/admins/:id', [UsersController, 'deleteAdmin'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         router
             .get('/admins/search', [UsersController, 'searchAdmins'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
@@ -73,16 +92,23 @@ router
         router
             .get('/managers', [UsersController, 'getManagers'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-        router.get('/managers/:id', [UsersController, 'getManagerById'])
+
         router
-            .post('/manager', [UsersController, 'createManager'])
+            .get('/managers/:id', [UsersController, 'getManagerById'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
+        router
+            .post('/managers', [UsersController, 'createManager'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         router
             .put('/managers/:id', [UsersController, 'updateManager'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         router
             .delete('/managers/:id', [UsersController, 'deleteManager'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         router
             .get('/managers/search', [UsersController, 'searchManagers'])
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
@@ -92,6 +118,7 @@ router
         // -------------------------
         router.post('/:id/password', [UsersController, 'addPassword'])
         router.post('/forgot-password', [UsersController, 'forgotPassword'])
+        router.post('/reset-password/:token', [UsersController, 'resetPassword'])
 
         // -------------------------
         // AUTH

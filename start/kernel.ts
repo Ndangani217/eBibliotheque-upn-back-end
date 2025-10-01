@@ -2,10 +2,6 @@
 |--------------------------------------------------------------------------
 | HTTP kernel file
 |--------------------------------------------------------------------------
-|
-| The HTTP kernel file is used to register the middleware with the server
-| or the router.
-|
 */
 
 import router from '@adonisjs/core/services/router'
@@ -14,15 +10,31 @@ import '#tasks/reservationCron'
 import '#tasks/subscriptionCron'
 
 /**
- * The error handler is used to convert an exception
- * to an HTTP response.
+ * Error handler
  */
 server.errorHandler(() => import('#exceptions/handler'))
 
 /**
- * The server middleware stack runs middleware on all the HTTP
- * requests, even if there is no route registered for
- * the request URL.
+ * Middleware global (toujours exécuté sur toutes les requêtes avec une route)
+ */
+export const middleware = {
+    default: [
+        () => import('@adonisjs/core/bodyparser_middleware'),
+        () => import('#middleware/heartbeat_middleware'),
+    ],
+}
+
+/**
+ * Middleware nommés (utilisables dans .middleware([...]) sur les routes)
+ */
+export const namedMiddleware = router.named({
+    auth: () => import('#middleware/auth_middleware'),
+    hasRole: () => import('#middleware/has_role_middleware'),
+    heartbeat: () => import('#middleware/heartbeat_middleware'),
+})
+
+/**
+ * Middleware pour toutes les requêtes, même sans route correspondante
  */
 server.use([
     () => import('#middleware/container_bindings_middleware'),
@@ -31,20 +43,10 @@ server.use([
 ])
 
 /**
- * The router middleware stack runs middleware on all the HTTP
- * requests with a registered route.
+ * Middleware appliqués à toutes les routes
  */
 router.use([
     () => import('@adonisjs/core/bodyparser_middleware'),
     () => import('@adonisjs/auth/initialize_auth_middleware'),
     () => import('#middleware/initialize_bouncer_middleware'),
 ])
-
-/**
- * Named middleware collection must be explicitly assigned to
- * the routes or the routes group.
- */
-export const middleware = router.named({
-    auth: () => import('#middleware/auth_middleware'),
-    hasRole: () => import('#middleware/has_role_middleware'),
-})
