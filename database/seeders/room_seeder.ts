@@ -4,26 +4,26 @@ import Room from '#models/room'
 
 export default class RoomSeeder extends BaseSeeder {
     public async run() {
-        const batiments = [
-            { name: 'A', niveaux: 4 },
-            { name: 'B', niveaux: 3 },
+        const homes = [
+            { name: 'Home 1', niveaux: 4 },
+            { name: 'Home 2', niveaux: 3 },
         ]
 
         const rooms: any[] = []
 
-        for (const batiment of batiments) {
-            for (let niveau = 0; niveau <= batiment.niveaux; niveau++) {
+        for (const home of homes) {
+            for (let niveau = 0; niveau <= home.niveaux; niveau++) {
                 const niveauLabel = niveau === 0 ? 'RDC' : `Niveau ${niveau}`
 
                 for (let numero = 1; numero <= 10; numero++) {
                     rooms.push({
-                        type: 'M',
+                        type: 'Standard',
                         capacity: 4,
                         availableSpots: 4,
-                        location: `Bâtiment ${batiment.name} - ${niveauLabel}`,
+                        location: `${home.name} - ${niveauLabel} - Ch ${numero}`,
                         occupancyStatus: 'Disponible',
                         isAvailable: true,
-                        description: `Chambre ${numero} - ${niveauLabel}, bâtiment ${batiment.name}`,
+                        description: `Chambre ${numero} au ${niveauLabel} de ${home.name}`,
                     })
                 }
             }
