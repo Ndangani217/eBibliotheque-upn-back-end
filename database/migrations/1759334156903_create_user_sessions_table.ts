@@ -21,9 +21,6 @@ export default class extends BaseSchema {
             table.string('user_agent', 512).nullable()
 
             table.timestamps(true, true)
-
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
         })
     }
 

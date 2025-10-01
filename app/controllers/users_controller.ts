@@ -50,7 +50,7 @@ export default class UsersController {
                         name: user.name,
                         lastName: user.lastName,
                         phoneNumber: user.phoneNumber,
-                        facultyCode: user.facultyCode,
+                        facultyCode: user.faculty?.code,
                         department: user.department,
                         promotion: user.promotion,
                         photoUrl: user.photoUrl,

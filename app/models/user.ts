@@ -35,14 +35,14 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column({ columnName: 'phone_number', serializeAs: 'phoneNumber' })
     declare phoneNumber: string
 
-    @column()
-    declare faculty: string | null
+    @column({ columnName: 'faculty_id', serializeAs: 'facultyId' })
+    declare facultyId: number | null
 
     @belongsTo(() => Faculty, {
-        foreignKey: 'faculty',
-        localKey: 'code',
+        foreignKey: 'facultyId',
+        localKey: 'id',
     })
-    declare facultyCode: BelongsTo<typeof Faculty>
+    declare faculty: BelongsTo<typeof Faculty>
 
     @column()
     declare department: string
