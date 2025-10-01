@@ -24,6 +24,7 @@ const ReservationsController = () => import('#controllers/reservations_controlle
 const PaymentsController = () => import('#controllers/payments_controller')
 const ConductsController = () => import('#controllers/conducts_controller')
 const SubscriptionsController = () => import('#controllers/subscriptions_controller')
+import { DateTime } from 'luxon'
 
 import { Role } from '#types/role'
 router
@@ -126,6 +127,22 @@ router
         router.get('/me', [UsersController, 'me']).middleware([middleware.auth()])
         router.post('/login', [UsersController, 'login'])
         router.post('/logout', [UsersController, 'logout']).middleware([middleware.auth()])
+
+        // Dans /users
+        router
+            .get('/:id/sessions/day', [UsersController, 'sessionsOfDay'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN, Role.MANAGER])])
+
+        router
+            .post('/heartbeat', async ({ auth, response }) => {
+                if (!auth.user) {
+                    return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+                }
+                auth.user.lastSeenAt = DateTime.now()
+                await auth.user.save()
+                return response.ok({ status: 'success', message: 'Heartbeat enregistré' })
+            })
+            .middleware([middleware.auth()])
     })
     .prefix('/users')
 
