@@ -11,7 +11,7 @@ export default class extends BaseSchema {
                 .integer('student_id')
                 .unsigned()
                 .references('id')
-                .inTable('students')
+                .inTable('users')
                 .onDelete('CASCADE')
 
             table
@@ -28,10 +28,7 @@ export default class extends BaseSchema {
 
             table.string('reference').unique().notNullable()
 
-            table.timestamps(true)
-
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
+            table.timestamps(true, true)
         })
     }
 

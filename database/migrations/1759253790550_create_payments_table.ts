@@ -1,4 +1,5 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
+import { PaymentStatus } from '#types/paymentStatus'
 
 export default class extends BaseSchema {
     protected tableName = 'payments'
@@ -15,27 +16,23 @@ export default class extends BaseSchema {
                 .onDelete('CASCADE')
 
             table.decimal('amount', 10, 2).notNullable()
-
             table.string('reference').notNullable()
-
             table.timestamp('date', { useTz: true }).notNullable()
 
             table
-                .enu('status', ['validé', 'en attente', 'rejeté'], {
+                .enum('status', Object.values(PaymentStatus), {
                     useNative: true,
                     enumName: 'payment_status',
                 })
                 .notNullable()
-                .defaultTo('en attente')
+                .defaultTo(PaymentStatus.EN_ATTENTE)
 
-            table.timestamps(true)
-
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
+            table.timestamps(true, true)
         })
     }
 
     async down() {
         this.schema.dropTable(this.tableName)
+        this.schema.raw('DROP TYPE IF EXISTS payment_status')
     }
 }

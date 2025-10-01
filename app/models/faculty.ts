@@ -5,17 +5,18 @@ import User from '#models/user'
 import { Role } from '#types/role'
 
 export default class Faculty extends BaseModel {
-    public static primaryKey = 'code'
-
     @column({ isPrimary: true })
+    declare id: number
+
+    @column()
     declare code: string
 
     @column()
     declare name: string
 
     @hasMany(() => User, {
-        foreignKey: 'facultyCode',
-        localKey: 'code',
+        foreignKey: 'facultyId',
+        localKey: 'id',
         onQuery: (query) => {
             query.where('role', Role.STUDENT)
         },
