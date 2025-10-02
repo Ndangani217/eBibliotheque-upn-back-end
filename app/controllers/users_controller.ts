@@ -3,6 +3,8 @@ import User from '#models/user'
 import { Role } from '#types/role'
 import crypto from 'node:crypto'
 import { DateTime } from 'luxon'
+import Mail from '@adonisjs/mail/services/main'
+import env from '#start/env'
 import {
     loginValidator,
     AddPasswordValidator,
@@ -227,6 +229,26 @@ export default class UsersController {
         try {
             const payload = await request.validateUsing(createStudentValidator)
             const user = await User.create({ ...payload, role: Role.STUDENT, isVerified: false })
+            // 1) Génère un token et stocke le hash
+            const rawToken = crypto.randomBytes(32).toString('hex')
+            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+            user.verifyToken = hashed
+            await user.save()
+
+            // 2) Lien pour définir le password (front Next.js)
+            const url = `${env.get('FRONT_URL')}/confirm-password?userId=${user.id}&token=${rawToken}`
+
+            // 3) Envoie l'email
+            await Mail.use('smtp').send((message) => {
+                message
+                    .from(
+                        env.get('MAIL_FROM_ADDRESS') as string,
+                        env.get('MAIL_FROM_NAME') as string,
+                    )
+                    .to(user.email)
+                    .subject('Activez votre compte')
+                    .htmlView('emails/activation', { user, url })
+            })
 
             return response.created({
                 status: 'success',
@@ -243,9 +265,27 @@ export default class UsersController {
             const payload = await request.validateUsing(createManagerValidator)
             const user = await User.create({ ...payload, role: Role.MANAGER, isVerified: false })
 
+            const rawToken = crypto.randomBytes(32).toString('hex')
+            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+            user.verifyToken = hashed
+            await user.save()
+
+            const url = `${env.get('FRONT_URL')}/confirm-password?userId=${user.id}&token=${rawToken}`
+
+            await Mail.use('smtp').send((message) => {
+                message
+                    .from(
+                        env.get('MAIL_FROM_ADDRESS') as string,
+                        env.get('MAIL_FROM_NAME') as string,
+                    )
+                    .to(user.email)
+                    .subject('Activez votre compte')
+                    .htmlView('emails/activation', { user, url })
+            })
+
             return response.created({
                 status: 'success',
-                message: 'Manager créé avec succès',
+                message: 'Manager créé avec succès (email envoyé)',
                 data: user,
             })
         } catch (error) {
@@ -257,6 +297,24 @@ export default class UsersController {
         try {
             const payload = await request.validateUsing(createAdminValidator)
             const user = await User.create({ ...payload, role: Role.ADMIN, isVerified: false })
+
+            const rawToken = crypto.randomBytes(32).toString('hex')
+            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+            user.verifyToken = hashed
+            await user.save()
+
+            const url = `${env.get('FRONT_URL')}/confirm-password?userId=${user.id}&token=${rawToken}`
+
+            await Mail.use('smtp').send((message) => {
+                message
+                    .from(
+                        env.get('MAIL_FROM_ADDRESS') as string,
+                        env.get('MAIL_FROM_NAME') as string,
+                    )
+                    .to(user.email)
+                    .subject('Activez votre compte')
+                    .htmlView('emails/activation', { user, url })
+            })
 
             return response.created({
                 status: 'success',
@@ -299,28 +357,25 @@ export default class UsersController {
     // -------------------------
     // SET PASSWORD AFTER ACTIVATION
     // -------------------------
-    async setPasswordAfterActivation({ params, request, response }: HttpContext) {
+    async addPassword({ params, request, response }: HttpContext) {
         try {
-            const { password } = await request.validateUsing(AddPasswordValidator)
+            const { password, token } = await request.validateUsing(AddPasswordValidator)
 
-            const hashed = crypto.createHash('sha256').update(params.token).digest('hex')
-
-            const user = await User.query()
-                .where('verify_token', hashed)
-                .andWhere('is_verified', false)
-                .first()
-
+            const user = await User.find(params.id)
             if (!user) {
-                return response.badRequest({
-                    status: 'error',
-                    message: 'Lien invalide ou expiré',
-                })
+                return response.notFound({ status: 'error', message: 'Utilisateur introuvable' })
             }
 
             if (user.password) {
+                return response.badRequest({ status: 'error', message: 'Mot de passe déjà défini' })
+            }
+
+            // Vérif du token
+            const hashed = crypto.createHash('sha256').update(token).digest('hex')
+            if (!user.verifyToken || user.verifyToken !== hashed) {
                 return response.badRequest({
                     status: 'error',
-                    message: 'Mot de passe déjà défini',
+                    message: 'Lien d’activation invalide',
                 })
             }
 
@@ -331,7 +386,7 @@ export default class UsersController {
 
             return response.ok({
                 status: 'success',
-                message: 'Compte activé et mot de passe défini avec succès',
+                message: 'Mot de passe défini avec succès',
                 data: { id: user.id, email: user.email },
             })
         } catch (error) {

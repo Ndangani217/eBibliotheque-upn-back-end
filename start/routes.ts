@@ -169,8 +169,8 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
         // PASSWORD & AUTH
-        //router.post('/:id/password', [UsersController, 'addPassword'])
-        router.post('/users/set-password/:token', [UsersController, 'setPasswordAfterActivation'])
+        router.post('/:id/password', [UsersController, 'addPassword'])
+        //router.post('/users/set-password/:token', [UsersController, 'setPasswordAfterActivation'])
         router.post('/forgot-password', [UsersController, 'forgotPassword'])
         router.post('/reset-password/:token', [UsersController, 'resetPassword'])
 

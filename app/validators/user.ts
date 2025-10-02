@@ -28,6 +28,7 @@ export const AddPasswordValidator = vine.compile(
             .minLength(8)
             .maxLength(32)
             .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/),
+        token: vine.string(),
     }),
 )
 
