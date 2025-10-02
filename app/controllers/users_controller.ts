@@ -32,6 +32,13 @@ export default class UsersController {
                 return response.unauthorized({ status: 'error', message: 'Identifiants invalides' })
             }
 
+            if (userCurrent.isBlocked) {
+                return response.forbidden({
+                    status: 'error',
+                    message: 'Votre compte est bloqué, contactez l’administration',
+                })
+            }
+
             const user = await User.verifyCredentials(email, password)
             const token = await auth.use('api').createToken(user)
             await UserSessionService.start(user, { request } as HttpContext)
@@ -81,7 +88,17 @@ export default class UsersController {
     async me({ auth, response }: HttpContext) {
         try {
             if (!auth.user) {
-                return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+                return response.unauthorized({
+                    status: 'error',
+                    message: 'Non authentifié',
+                })
+            }
+
+            if (auth.user.isBlocked) {
+                return response.forbidden({
+                    status: 'error',
+                    message: 'Votre compte est bloqué, contactez l’administration',
+                })
             }
 
             return response.ok({
@@ -553,6 +570,43 @@ export default class UsersController {
             })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer les sessions')
+        }
+    }
+
+    /**
+     * Bloquer un manager
+     */
+    async block({ params, response }: HttpContext) {
+        try {
+            const manager = await User.findOrFail(params.id)
+            manager.isBlocked = true
+            await manager.save()
+
+            return response.ok({
+                status: 'success',
+                message: 'Manager bloqué avec succès',
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de bloquer ce manager')
+        }
+    }
+
+    /**
+     * Débloquer un manager
+     */
+    async unblock({ params, response }: HttpContext) {
+        try {
+            const manager = await User.findOrFail(params.id)
+            manager.isBlocked = false
+            await manager.save()
+
+            return response.ok({
+                status: 'success',
+                message: 'Manager débloqué avec succès',
+            })
+        } catch (error) {
+            console.error('Erreur lors du déblocage du manager :', error)
+            return handleError(response, error, 'Impossible de débloquer ce manager')
         }
     }
 }

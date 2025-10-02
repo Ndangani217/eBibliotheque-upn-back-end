@@ -8,8 +8,6 @@ class UserSessionService {
     /** Démarre une session (login) */
     async start(user: User, ctx: HttpContext) {
         const ip = ctx.request.ip()
-        const userAgent = ctx.request.header('user-agent') ?? null
-
         // Option : fermer toute session restée "ouverte" (logout_at null)
         await UserSession.query()
             .where('user_id', user.id)
@@ -21,7 +19,6 @@ class UserSessionService {
             loginAt: DateTime.now(),
             logoutAt: null,
             ip,
-            userAgent,
         })
     }
 

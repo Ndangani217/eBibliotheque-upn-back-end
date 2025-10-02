@@ -30,6 +30,7 @@ export default class extends BaseSchema {
             table.string('password').nullable()
             table.enum('role', Object.values(Role)).notNullable()
             table.boolean('is_verified').notNullable().defaultTo(false)
+            table.boolean('is_blocked').notNullable().defaultTo(false)
 
             table.timestamp('last_seen_at', { useTz: true }).nullable()
 

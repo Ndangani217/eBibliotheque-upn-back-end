@@ -19,9 +19,6 @@ export default class UserSession extends BaseModel {
     @column()
     declare ip?: string | null
 
-    @column({ columnName: 'manager' })
-    declare userAgent?: string | null
-
     @belongsTo(() => User)
     declare user: BelongsTo<typeof User>
 

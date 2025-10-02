@@ -31,6 +31,7 @@ export const namedMiddleware = router.named({
     auth: () => import('#middleware/auth_middleware'),
     hasRole: () => import('#middleware/has_role_middleware'),
     heartbeat: () => import('#middleware/heartbeat_middleware'),
+    checkBlocked: () => import('#middleware/check_blocked_middleware'),
 })
 
 /**
@@ -40,6 +41,7 @@ server.use([
     () => import('#middleware/container_bindings_middleware'),
     () => import('#middleware/force_json_response_middleware'),
     () => import('@adonisjs/cors/cors_middleware'),
+    () => import('#middleware/check_blocked_middleware'),
 ])
 
 /**

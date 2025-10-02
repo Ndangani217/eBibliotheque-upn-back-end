@@ -16,9 +16,7 @@ export default class extends BaseSchema {
 
             table.timestamp('login_at', { useTz: true }).notNullable()
             table.timestamp('logout_at', { useTz: true }).nullable()
-
             table.string('ip', 64).nullable()
-            table.string('user_agent', 512).nullable()
 
             table.timestamps(true, true)
         })
