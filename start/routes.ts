@@ -160,8 +160,17 @@ router
                 middleware.checkBlocked(),
             ])
 
+        router
+            .patch('/managers/:id/block', [UsersController, 'block'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
+        router
+            .patch('/managers/:id/unblock', [UsersController, 'unblock'])
+            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
+
         // PASSWORD & AUTH
-        router.post('/:id/password', [UsersController, 'addPassword'])
+        //router.post('/:id/password', [UsersController, 'addPassword'])
+        router.post('/users/set-password/:token', [UsersController, 'setPasswordAfterActivation'])
         router.post('/forgot-password', [UsersController, 'forgotPassword'])
         router.post('/reset-password/:token', [UsersController, 'resetPassword'])
 
@@ -562,8 +571,10 @@ router
 // -------------------------
 // SUBSCRIPTIONS
 // -------------------------
+
 router
     .group(() => {
+        // Récupérer tous les abonnements
         router
             .get('/', [SubscriptionsController, 'getAllSubscriptions'])
             .middleware([
@@ -572,6 +583,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Récupérer un abonnement par ID
         router
             .get('/:id', [SubscriptionsController, 'getByIdSubscription'])
             .middleware([
@@ -580,6 +592,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Créer un abonnement
         router
             .post('/', [SubscriptionsController, 'create'])
             .middleware([
@@ -588,6 +601,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Mettre à jour un abonnement
         router
             .put('/:id', [SubscriptionsController, 'update'])
             .middleware([
@@ -596,6 +610,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Supprimer un abonnement
         router
             .delete('/:id', [SubscriptionsController, 'delete'])
             .middleware([
@@ -604,6 +619,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Récupérer les paiements liés à un abonnement
         router
             .get('/:id/payments', [SubscriptionsController, 'payments'])
             .middleware([
@@ -612,6 +628,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Récupérer les abonnements expirant dans une période (day, week, month, year)
         router
             .get('/expiring/list', [SubscriptionsController, 'expiring'])
             .middleware([
@@ -620,6 +637,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Récupérer les abonnements par statut
         router
             .get('/status/list', [SubscriptionsController, 'byStatus'])
             .middleware([
@@ -628,6 +646,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Calculer le temps restant d’un abonnement
         router
             .get('/:id/remaining', [SubscriptionsController, 'remainingTime'])
             .middleware([

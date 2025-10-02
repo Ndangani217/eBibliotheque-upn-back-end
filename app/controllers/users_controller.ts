@@ -271,7 +271,7 @@ export default class UsersController {
     // -------------------------
     // ADD PASSWORD
     // -------------------------
-    async addPassword({ params, request, response }: HttpContext) {
+    /*async addPassword({ params, request, response }: HttpContext) {
         try {
             const { password } = await request.validateUsing(AddPasswordValidator)
             const user = await User.find(params.id)
@@ -289,6 +289,49 @@ export default class UsersController {
             return response.ok({
                 status: 'success',
                 message: 'Mot de passe défini avec succès',
+                data: { id: user.id, email: user.email },
+            })
+        } catch (error) {
+            return handleError(response, error, 'Impossible de définir le mot de passe')
+        }
+    }*/
+
+    // -------------------------
+    // SET PASSWORD AFTER ACTIVATION
+    // -------------------------
+    async setPasswordAfterActivation({ params, request, response }: HttpContext) {
+        try {
+            const { password } = await request.validateUsing(AddPasswordValidator)
+
+            const hashed = crypto.createHash('sha256').update(params.token).digest('hex')
+
+            const user = await User.query()
+                .where('verify_token', hashed)
+                .andWhere('is_verified', false)
+                .first()
+
+            if (!user) {
+                return response.badRequest({
+                    status: 'error',
+                    message: 'Lien invalide ou expiré',
+                })
+            }
+
+            if (user.password) {
+                return response.badRequest({
+                    status: 'error',
+                    message: 'Mot de passe déjà défini',
+                })
+            }
+
+            user.password = password
+            user.isVerified = true
+            user.verifyToken = null
+            await user.save()
+
+            return response.ok({
+                status: 'success',
+                message: 'Compte activé et mot de passe défini avec succès',
                 data: { id: user.id, email: user.email },
             })
         } catch (error) {
