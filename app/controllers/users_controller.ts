@@ -293,18 +293,31 @@ export default class UsersController {
         }
     }
 
+    /**
+     * Création d’un admin avec envoi d’un mail d’activation
+     */
     async createAdmin({ request, response }: HttpContext) {
         try {
+            // 1) Validation
             const payload = await request.validateUsing(createAdminValidator)
-            const user = await User.create({ ...payload, role: Role.ADMIN, isVerified: false })
+            // 2) Création de l'admin
+            const user = await User.create({
+                ...payload,
+                role: Role.ADMIN,
+                isVerified: false,
+            })
 
+            // 3) Génération du token
             const rawToken = crypto.randomBytes(32).toString('hex')
             const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+
             user.verifyToken = hashed
             await user.save()
 
+            // 4) Génération de l’URL (Next.js)
             const url = `${env.get('FRONT_URL')}/confirm-password?userId=${user.id}&token=${rawToken}`
 
+            // 5) Envoi de l’email
             await Mail.use('smtp').send((message) => {
                 message
                     .from(
@@ -316,16 +329,19 @@ export default class UsersController {
                     .htmlView('emails/activation', { user, url })
             })
 
+            // 6) Réponse API sécurisée
             return response.created({
                 status: 'success',
-                message: 'Admin créé avec succès',
-                data: user,
+                message: 'Admin créé avec succès. Un email d’activation a été envoyé.',
+                data: {
+                    id: user.id,
+                    email: user.email,
+                },
             })
         } catch (error) {
             return handleError(response, error, 'Impossible de créer l’admin')
         }
     }
-
     // -------------------------
     // ADD PASSWORD
     // -------------------------

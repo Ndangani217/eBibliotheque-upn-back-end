@@ -83,9 +83,7 @@ export const updateStudentValidator = vine.compile(
  * ADMIN & MANAGER VALIDATOR
  * -------------------------
  */
-// Schéma de base réutilisable
 const baseUserSchema = {
-    email: vine.string().trim().email().unique({ table: 'users', column: 'email' }),
     firstName: vine.string().minLength(3),
     name: vine.string().minLength(3),
     lastName: vine.string().minLength(3),
@@ -95,32 +93,42 @@ const baseUserSchema = {
         .optional(),
 }
 
-/**
- * -------------------------
- * CREATE MANAGER VALIDATOR
- * -------------------------
- */
-export const createManagerValidator = vine.compile(vine.object(baseUserSchema))
-export const updateManagerValidator = vine.compile(
+const emailRequired = {
+    email: vine.string().trim().email().unique({ table: 'users', column: 'email' }),
+}
+
+const emailOptional = {
+    email: vine.string().trim().email().unique({ table: 'users', column: 'email' }).optional(),
+}
+
+export const createAdminValidator = vine.compile(
     vine.object({
         ...baseUserSchema,
-        email: vine.string().trim().email().unique({ table: 'users', column: 'email' }).optional(),
+        ...emailRequired,
+    }),
+)
+
+export const updateAdminValidator = vine.compile(
+    vine.object({
+        ...baseUserSchema,
+        ...emailOptional,
         firstName: vine.string().minLength(3).optional(),
         name: vine.string().minLength(3).optional(),
         lastName: vine.string().minLength(3).optional(),
     }),
 )
 
-/**
- * -------------------------
- * CREATE ADMIN VALIDATOR
- * -------------------------
- */
-export const createAdminValidator = vine.compile(vine.object(baseUserSchema))
-export const updateAdminValidator = vine.compile(
+export const createManagerValidator = vine.compile(
     vine.object({
         ...baseUserSchema,
-        email: vine.string().trim().email().unique({ table: 'users', column: 'email' }).optional(),
+        ...emailRequired,
+    }),
+)
+
+export const updateManagerValidator = vine.compile(
+    vine.object({
+        ...baseUserSchema,
+        ...emailOptional,
         firstName: vine.string().minLength(3).optional(),
         name: vine.string().minLength(3).optional(),
         lastName: vine.string().minLength(3).optional(),

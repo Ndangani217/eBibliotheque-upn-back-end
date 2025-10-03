@@ -25,6 +25,8 @@ import { Role } from '#types/role'
 // -------------------------
 router
     .group(() => {
+        router.post('/admins', [UsersController, 'createAdmin'])
+
         // STUDENTS
         router
             .get('/students/search', [UsersController, 'searchStudents'])
@@ -84,8 +86,6 @@ router
                 middleware.hasRole([Role.ADMIN]),
                 middleware.checkBlocked(),
             ])
-
-        router.post('/admins', [UsersController, 'createAdmin'])
 
         router
             .put('/admins/:id', [UsersController, 'updateAdmin'])
@@ -169,7 +169,7 @@ router
             .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
 
         // PASSWORD & AUTH
-        router.post('/:id/password', [UsersController, 'addPassword'])
+        router.post('/:id/add-password', [UsersController, 'addPassword'])
         //router.post('/users/set-password/:token', [UsersController, 'setPasswordAfterActivation'])
         router.post('/forgot-password', [UsersController, 'forgotPassword'])
         router.post('/reset-password/:token', [UsersController, 'resetPassword'])
@@ -656,3 +656,6 @@ router
             ])
     })
     .prefix('/subscriptions')
+
+const TestMailController = () => import('#controllers/test_mails_controller')
+router.get('/test-mail', [TestMailController, 'send'])

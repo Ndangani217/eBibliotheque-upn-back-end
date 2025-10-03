@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <body style="font-family: Arial, sans-serif;">
+    <h2>Activation de votre compte</h2>
+    <p>Bonjour {{ user.firstName }} {{ user.name }},</p>
+
+    <p>Votre compte a été créé. Pour l’activer, veuillez définir votre mot de passe :</p>
+
+    <p>
+      <a href="{{ url }}" 
+         style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">
+        Définir mon mot de passe
+      </a>
+    </p>
+
+    <p>Si le bouton ne fonctionne pas, copiez-collez ce lien :</p>
+    <p>{{ url }}</p>
+
+    <p>— L’équipe UPN</p>
+  </body>
+</html>

@@ -38,14 +38,15 @@ import { defineConfig, transports } from '@adonisjs/mail'
 
 const mailConfig = defineConfig({
     default: 'smtp',
+
     mailers: {
         smtp: transports.smtp({
-            host: env.get('SMTP_HOST'),
-            port: Number(env.get('SMTP_PORT')),
+            host: env.get('SMTP_HOST') || 'sandbox.smtp.mailtrap.io',
+            port: Number(env.get('SMTP_PORT') || 2525),
             auth: {
                 type: 'login',
-                user: env.get('SMTP_USERNAME') as string,
-                pass: env.get('SMTP_PASSWORD') as string,
+                user: env.get('SMTP_USERNAME')!, // "!" = tu assures à TS que ce n’est pas undefined
+                pass: env.get('SMTP_PASSWORD')!,
             },
         }),
     },
