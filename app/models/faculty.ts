@@ -17,11 +17,10 @@ export default class Faculty extends BaseModel {
     @hasMany(() => User, {
         foreignKey: 'facultyId',
         localKey: 'id',
-        onQuery: (query) => {
-            query.where('role', Role.STUDENT)
-        },
+        onQuery: (query) => query.where('role', Role.STUDENT),
     })
     declare students: HasMany<typeof User>
+
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime
 

@@ -1,7 +1,7 @@
 // src/validators/index.ts
 import vine from '@vinejs/vine'
 import { Gender } from '#types/gender'
-import { Faculty } from '#types/faculty'
+import { FacultyCode } from '#constants/faculties'
 import { Promotion } from '#types/promotion'
 
 /**
@@ -48,7 +48,7 @@ export const createStudentValidator = vine.compile(
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
-        faculty: vine.enum(Object.values(Faculty)),
+        faculty: vine.enum(Object.values(FacultyCode)), // ✅ faculté depuis constants backend
         department: vine.string(),
         promotion: vine.enum(Object.values(Promotion)),
         photoUrl: vine.string().url().optional(),
@@ -71,7 +71,7 @@ export const updateStudentValidator = vine.compile(
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
-        faculty: vine.enum(Object.values(Faculty)).optional(),
+        faculty: vine.enum(Object.values(FacultyCode)).optional(), // ✅ correction
         department: vine.string().optional(),
         promotion: vine.enum(Object.values(Promotion)).optional(),
         photoUrl: vine.string().url().optional(),
@@ -80,7 +80,7 @@ export const updateStudentValidator = vine.compile(
 
 /**
  * -------------------------
- * ADMIN & MANAGER VALIDATOR
+ * ADMIN & MANAGER VALIDATORS
  * -------------------------
  */
 const baseUserSchema = {
@@ -146,6 +146,11 @@ export const assignStudentValidator = vine.compile(
     }),
 )
 
+/**
+ * -------------------------
+ * PASSWORD VALIDATORS
+ * -------------------------
+ */
 export const forgotPasswordValidator = vine.compile(
     vine.object({
         email: vine.string().email(),
