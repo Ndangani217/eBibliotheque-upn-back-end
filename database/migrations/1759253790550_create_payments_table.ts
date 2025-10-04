@@ -17,8 +17,8 @@ export default class extends BaseSchema {
 
             table.decimal('amount', 10, 2).notNullable()
             table.string('reference').notNullable()
+            table.string('proof_url').nullable()
             table.timestamp('date', { useTz: true }).notNullable()
-
             table
                 .enum('status', Object.values(PaymentStatus), {
                     useNative: true,

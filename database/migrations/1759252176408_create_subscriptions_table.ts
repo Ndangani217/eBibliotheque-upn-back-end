@@ -13,25 +13,22 @@ export default class extends BaseSchema {
                 .references('id')
                 .inTable('users')
                 .onDelete('CASCADE')
-
             table
                 .integer('room_id')
                 .unsigned()
                 .references('id')
                 .inTable('rooms')
                 .onDelete('CASCADE')
-
             table.date('start_date').notNullable()
             table.date('end_date').notNullable()
-
-            table.enum('status', Object.values(SubscriptionStatus)).notNullable().defaultTo('actif')
-
+            table
+                .enum('status', Object.values(SubscriptionStatus))
+                .notNullable()
+                .defaultTo(SubscriptionStatus.ACTIF)
             table.string('reference').unique().notNullable()
-
             table.timestamps(true, true)
         })
     }
-
     async down() {
         this.schema.dropTable(this.tableName)
         this.schema.raw('DROP TYPE IF EXISTS subscription_status')

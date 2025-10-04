@@ -1,4 +1,5 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
+import { Status } from '#types/roomStatus'
 
 export default class extends BaseSchema {
     protected tableName = 'rooms'
@@ -10,7 +11,10 @@ export default class extends BaseSchema {
             table.string('location').nullable()
             table.integer('capacity').notNullable().defaultTo(4) // capacité fixe
             table.integer('available_spots').notNullable().defaultTo(4) // dispo initiale
-            table.string('occupancy_status').notNullable().defaultTo('Disponible')
+            table
+                .enum('occupancy_status', Object.values(Status))
+                .notNullable()
+                .defaultTo(Status.DISPONIBLE)
             table.boolean('is_available').notNullable().defaultTo(true)
             table.string('description', 255).nullable()
             table.timestamp('created_at', { useTz: true })

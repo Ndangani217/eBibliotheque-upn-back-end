@@ -228,17 +228,21 @@ export default class UsersController {
     async createStudent({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createStudentValidator)
-            const user = await User.create({ ...payload, role: Role.STUDENT, isVerified: false })
-            // 1) Génère un token et stocke le hash
+
+            const user = await User.create({
+                ...payload,
+                role: Role.STUDENT,
+                isVerified: false,
+            })
+
             const rawToken = crypto.randomBytes(32).toString('hex')
             const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+
             user.verifyToken = hashed
             await user.save()
 
-            // 2) Lien pour définir le password (front Next.js)
             const url = `${env.get('FRONT_URL')}/confirm-password?userId=${user.id}&token=${rawToken}`
 
-            // 3) Envoie l'email
             await Mail.use('smtp').send((message) => {
                 message
                     .from(
@@ -252,7 +256,8 @@ export default class UsersController {
 
             return response.created({
                 status: 'success',
-                message: 'Étudiant créé avec succès',
+                message:
+                    'Étudiant créé avec succès. Un lien d’activation a été envoyé à son adresse email.',
                 data: user,
             })
         } catch (error) {

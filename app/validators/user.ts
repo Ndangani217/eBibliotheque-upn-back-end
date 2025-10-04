@@ -1,7 +1,6 @@
 // src/validators/index.ts
 import vine from '@vinejs/vine'
 import { Gender } from '#types/gender'
-import { FacultyCode } from '#constants/faculties'
 import { Promotion } from '#types/promotion'
 
 /**
@@ -48,7 +47,10 @@ export const createStudentValidator = vine.compile(
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
-        faculty: vine.enum(Object.values(FacultyCode)), // ✅ faculté depuis constants backend
+
+        // ✅ On stocke maintenant l'ID de la faculté (clé étrangère)
+        facultyId: vine.number().exists({ table: 'faculties', column: 'id' }),
+
         department: vine.string(),
         promotion: vine.enum(Object.values(Promotion)),
         photoUrl: vine.string().url().optional(),
@@ -71,7 +73,10 @@ export const updateStudentValidator = vine.compile(
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
-        faculty: vine.enum(Object.values(FacultyCode)).optional(), // ✅ correction
+
+        // ✅ Correction ici aussi
+        facultyId: vine.number().exists({ table: 'faculties', column: 'id' }).optional(),
+
         department: vine.string().optional(),
         promotion: vine.enum(Object.values(Promotion)).optional(),
         photoUrl: vine.string().url().optional(),
