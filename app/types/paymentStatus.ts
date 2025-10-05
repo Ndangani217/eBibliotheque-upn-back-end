@@ -1,6 +1,6 @@
+// backend : #types/paymentStatus.ts
 export enum PaymentStatus {
-    VALIDE = 'Validé',
-    EN_ATTENTE = 'En attente',
-    REJETE = 'Rejeté',
+    VALIDE = 'validé',
+    EN_ATTENTE = 'en_attente',
+    REJETE = 'rejeté',
 }
-

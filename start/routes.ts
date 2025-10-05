@@ -329,7 +329,6 @@ router
             ])
     })
     .prefix('/rooms')
-
 // -------------------------
 // RESERVATIONS
 // -------------------------
@@ -352,18 +351,18 @@ router
             ])
 
         router
-            .post('/', [ReservationsController, 'create'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
             .get('/', [ReservationsController, 'getAllReservations'])
             .middleware([
                 middleware.auth(),
                 middleware.hasRole([Role.ADMIN, Role.MANAGER]),
+                middleware.checkBlocked(),
+            ])
+
+        router
+            .post('/', [ReservationsController, 'create'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.STUDENT]),
                 middleware.checkBlocked(),
             ])
 
@@ -430,70 +429,16 @@ router
 // -------------------------
 router
     .group(() => {
+        // Dashboard global
         router
-            .get('/', [PaymentsController, 'getAllPayments'])
+            .get('/dashboard', [PaymentsController, 'dashboard'])
             .middleware([
                 middleware.auth(),
                 middleware.hasRole([Role.ADMIN, Role.MANAGER]),
                 middleware.checkBlocked(),
             ])
 
-        router
-            .get('/:id', [PaymentsController, 'getById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/', [PaymentsController, 'create'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/:id', [PaymentsController, 'update'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .delete('/:id', [PaymentsController, 'destroy'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .patch('/:id/status', [PaymentsController, 'updateStatus'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
+        // 🔍 Recherche par référence bancaire
         router
             .get('/reference/:reference', [PaymentsController, 'searchByReference'])
             .middleware([
@@ -502,6 +447,25 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Paiements d’un abonnement
+        router
+            .get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+                middleware.checkBlocked(),
+            ])
+
+        // Total des paiements d’un abonnement
+        router
+            .get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+                middleware.checkBlocked(),
+            ])
+
+        //Paiements d’un étudiant par période
         router
             .get('/students/:studentId/payments/period', [PaymentsController, 'byStudentPeriod'])
             .middleware([
@@ -510,6 +474,7 @@ router
                 middleware.checkBlocked(),
             ])
 
+        //Résumé des paiements par période
         router
             .get('/students/:studentId/payments/summary', [
                 PaymentsController,
@@ -521,8 +486,54 @@ router
                 middleware.checkBlocked(),
             ])
 
+        // Liste générale
         router
-            .get('/dashboard', [PaymentsController, 'dashboard'])
+            .get('/', [PaymentsController, 'getAllPayments'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
+                middleware.checkBlocked(),
+            ])
+
+        //Création d’un paiement
+        router
+            .post('/', [PaymentsController, 'create'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.STUDENT, Role.MANAGER, Role.ADMIN]),
+                middleware.checkBlocked(),
+            ])
+
+        // 🔎 Détails d’un paiement
+        router
+            .get('/:id', [PaymentsController, 'getById'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+                middleware.checkBlocked(),
+            ])
+
+        // Mise à jour
+        router
+            .put('/:id', [PaymentsController, 'update'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
+                middleware.checkBlocked(),
+            ])
+
+        //Changement de statut
+        router
+            .patch('/:id/status', [PaymentsController, 'updateStatus'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
+                middleware.checkBlocked(),
+            ])
+
+        // Suppression d’un paiement
+        router
+            .delete('/:id', [PaymentsController, 'destroy'])
             .middleware([
                 middleware.auth(),
                 middleware.hasRole([Role.ADMIN, Role.MANAGER]),

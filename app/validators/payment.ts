@@ -14,9 +14,6 @@ export const createPaymentValidator = vine.compile(
         subscriptionId: vine.number().positive(),
         amount: vine.number().min(1),
         reference: vine.string().trim().minLength(5),
-        date: vine
-            .date({ formats: ['YYYY-MM-DD'] })
-            .transform((value) => DateTime.fromJSDate(value)),
     }),
 )
 

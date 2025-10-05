@@ -7,18 +7,27 @@ export default class extends BaseSchema {
     async up() {
         this.schema.createTable(this.tableName, (table) => {
             table.increments('id')
+            table
+                .integer('reservation_id')
+                .unsigned()
+                .references('id')
+                .inTable('reservations')
+                .onDelete('CASCADE')
 
             table
                 .integer('subscription_id')
                 .unsigned()
+                .nullable()
                 .references('id')
                 .inTable('subscriptions')
-                .onDelete('CASCADE')
+                .onDelete('SET NULL')
 
             table.decimal('amount', 10, 2).notNullable()
             table.string('reference').notNullable()
             table.string('proof_url').nullable()
-            table.timestamp('date', { useTz: true }).notNullable()
+
+            table.timestamp('date', { useTz: true }).notNullable().defaultTo(this.now())
+
             table
                 .enum('status', Object.values(PaymentStatus), {
                     useNative: true,

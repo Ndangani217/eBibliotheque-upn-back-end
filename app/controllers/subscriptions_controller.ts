@@ -7,13 +7,14 @@ import { getExpiryRange } from '#helpers/dateRange'
 import type { Period } from '#types/period'
 
 export default class SubscriptionsController {
-    // Récupérer tous les abonnements avec leurs relations (student, room, payments)
+    /** Récupère tous les abonnements avec leurs relations (étudiant, chambre, paiements) */
     async getAllSubscriptions({ response }: HttpContext) {
         try {
             const subscriptions = await Subscription.query()
                 .preload('student')
                 .preload('room')
                 .preload('payments')
+
             return response.ok({
                 status: 'success',
                 message: 'Abonnements récupérés avec succès',
@@ -24,7 +25,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // Récupérer les détails d’un abonnement spécifique par ID
+    /** Récupère un abonnement spécifique via son ID */
     async getByIdSubscription({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -44,7 +45,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // Créer un nouvel abonnement (valide les données puis insère en DB)
+    /** Crée un nouvel abonnement (validation et insertion) */
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createSubscriptionValidator)
@@ -60,7 +61,7 @@ export default class SubscriptionsController {
         }
     }
 
-    //  Mettre à jour un abonnement existant
+    /** Met à jour un abonnement existant */
     async update({ params, request, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -79,7 +80,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // Supprimer un abonnement existant par ID
+    /** Supprime un abonnement existant par son ID */
     async delete({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -88,14 +89,13 @@ export default class SubscriptionsController {
             return response.ok({
                 status: 'success',
                 message: 'Abonnement supprimé avec succès',
-                data: null,
             })
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la suppression de l’abonnement')
         }
     }
 
-    // Récupérer tous les paiements liés à un abonnement donné
+    /** Récupère tous les paiements liés à un abonnement */
     async payments({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -113,7 +113,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // Récupérer les abonnements expirant dans un délai défini (jour/semaine/mois/année)
+    /** Récupère les abonnements expirant bientôt selon une période donnée (jour/semaine/mois/année) */
     async expiring({ request, response }: HttpContext) {
         try {
             const period = request.input('period', 'day') as Period
@@ -151,10 +151,10 @@ export default class SubscriptionsController {
         }
     }
 
-    // Récupérer les abonnements selon leur statut (actif, expiré, suspendu)
+    /** Récupère les abonnements selon leur statut (actif, expiré, suspendu) */
     async byStatus({ request, response }: HttpContext) {
         try {
-            const status = request.input('status') // ?status=actif
+            const status = request.input('status')
 
             if (!['actif', 'expiré', 'suspendu'].includes(status)) {
                 return response.badRequest({
@@ -190,7 +190,7 @@ export default class SubscriptionsController {
         }
     }
 
-    // Calculer le temps restant d’un abonnement (jours, semaines, mois)
+    /** Calcule le temps restant d’un abonnement (en jours, semaines, mois) */
     async remainingTime({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()

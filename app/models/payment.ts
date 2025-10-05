@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo, hasOne } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasOne } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Reservation from '#models/reservation'
 import Subscription from '#models/subscription'
 import { PaymentStatus } from '#types/paymentStatus'
 
@@ -9,16 +10,19 @@ export default class Payment extends BaseModel {
     declare id: number
 
     @column()
-    declare subscriptionId: number
+    declare reservationId: number
+
+    @column()
+    declare subscriptionId?: number | null
 
     @column()
     declare amount: number
 
-    @column({ columnName: 'proof_url' })
-    declare proofUrl: string | null
-
     @column()
     declare reference: string
+
+    @column({ columnName: 'proof_url' })
+    declare proofUrl: string | null
 
     @column.dateTime()
     declare date: DateTime
@@ -26,11 +30,11 @@ export default class Payment extends BaseModel {
     @column()
     declare status: PaymentStatus
 
+    @belongsTo(() => Reservation)
+    declare reservation: BelongsTo<typeof Reservation>
+
     @belongsTo(() => Subscription)
     declare subscription: BelongsTo<typeof Subscription>
-
-    @hasOne(() => Subscription, { foreignKey: 'paymentId' })
-    declare principalSubscription: HasOne<typeof Subscription>
 
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime

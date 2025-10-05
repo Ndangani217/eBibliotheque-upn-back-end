@@ -14,19 +14,16 @@ export default class Subscription extends BaseModel {
     declare studentId: number
 
     @column()
-    declare amount: number
-
-    @column()
     declare roomId: number
 
     @column()
-    declare paymentId?: number
+    declare paymentId?: number | null
 
     @column.date()
-    declare startDate?: DateTime
+    declare startDate: DateTime
 
     @column.date()
-    declare endDate?: DateTime
+    declare endDate: DateTime
 
     @column()
     declare status: SubscriptionStatus
@@ -40,7 +37,7 @@ export default class Subscription extends BaseModel {
     @belongsTo(() => Room)
     declare room: BelongsTo<typeof Room>
 
-    @belongsTo(() => Payment, { foreignKey: 'paymentId' })
+    @belongsTo(() => Payment)
     declare payment: BelongsTo<typeof Payment>
 
     @hasMany(() => Payment)
