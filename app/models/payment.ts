@@ -14,8 +14,8 @@ export default class Payment extends BaseModel {
     @column()
     declare amount: number
 
-    @column()
-    declare proofUrl?: string
+    @column({ columnName: 'proof_url' })
+    declare proofUrl: string | null
 
     @column()
     declare reference: string

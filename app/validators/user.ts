@@ -47,8 +47,6 @@ export const createStudentValidator = vine.compile(
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
-
-        // ✅ On stocke maintenant l'ID de la faculté (clé étrangère)
         facultyId: vine.number().exists({ table: 'faculties', column: 'id' }),
 
         department: vine.string(),
@@ -73,8 +71,6 @@ export const updateStudentValidator = vine.compile(
             .string()
             .regex(/^(?:\+243|0)[1-9]\d{8}$/)
             .optional(),
-
-        // ✅ Correction ici aussi
         facultyId: vine.number().exists({ table: 'faculties', column: 'id' }).optional(),
 
         department: vine.string().optional(),

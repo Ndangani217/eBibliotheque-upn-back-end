@@ -1,20 +1,20 @@
 import { HttpContext } from '@adonisjs/core/http'
 import Payment from '#models/payment'
-import { createPaymentValidator, updatePaymentValidator } from '#validators/payment'
 import Subscription from '#models/subscription'
+import { createPaymentValidator, updatePaymentValidator } from '#validators/payment'
 import { Period } from '#types/period'
 import { getRange } from '#helpers/dateRange'
+import { uploadToCloudinary } from '#services/cloudinary'
 import { HandleError as handleError } from '#helpers/handleError'
 
 export default class PaymentsController {
-    // Liste de tous les paiements (avec filtre statut optionnel)
+    // 1 Liste de tous les paiements
     async getAllPayments({ request, response }: HttpContext) {
         try {
             const status = request.input('status')
             const query = Payment.query().preload('subscription')
-            if (status) {
-                query.where('status', status)
-            }
+            if (status) query.where('status', status)
+
             const payments = await query
             return response.ok({
                 status: 'success',
@@ -26,7 +26,7 @@ export default class PaymentsController {
         }
     }
 
-    // 2. Détails d’un paiement
+    // Détails d’un paiement
     async getById({ params, response }: HttpContext) {
         try {
             const payment = await Payment.query()
@@ -44,11 +44,32 @@ export default class PaymentsController {
         }
     }
 
-    // 3. Créer un paiement
+    // Créer un paiement avec upload Cloudinary
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createPaymentValidator)
-            const payment = await Payment.create(payload)
+            let proofUrl: string | null = null
+            const proofFile = request.file('proof', {
+                size: '5mb',
+                extnames: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+            })
+
+            if (proofFile) {
+                const uploadResult = await uploadToCloudinary(proofFile, 'payments')
+
+                if (!uploadResult.status) {
+                    return response.badRequest({
+                        status: 'error',
+                        message: uploadResult.error,
+                    })
+                }
+                proofUrl = uploadResult.url ?? null
+            }
+            const payment = await Payment.create({
+                ...payload,
+                proofUrl,
+            })
+
             return response.created({
                 status: 'success',
                 message: 'Paiement créé avec succès',
@@ -59,12 +80,36 @@ export default class PaymentsController {
         }
     }
 
-    // 4. Mettre à jour un paiement
+    // Mettre à jour un paiement (y compris la preuve Cloudinary)
     async update({ params, request, response }: HttpContext) {
         try {
             const payment = await Payment.findOrFail(params.id)
             const payload = await request.validateUsing(updatePaymentValidator)
-            payment.merge(payload)
+
+            let proofUrl: string | null = payment.proofUrl ?? null
+
+            const proofFile = request.file('proof', {
+                size: '5mb',
+                extnames: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+            })
+
+            if (proofFile) {
+                const uploadResult = await uploadToCloudinary(proofFile, 'payments')
+
+                if (!uploadResult.status) {
+                    return response.badRequest({
+                        status: 'error',
+                        message: uploadResult.error,
+                    })
+                }
+
+                proofUrl = uploadResult.url ?? null
+            }
+
+            payment.merge({
+                ...payload,
+                proofUrl,
+            })
             await payment.save()
 
             return response.ok({
@@ -77,7 +122,7 @@ export default class PaymentsController {
         }
     }
 
-    // 5. Supprimer un paiement
+    //Supprimer un paiement
     async destroy({ params, response }: HttpContext) {
         try {
             const payment = await Payment.findOrFail(params.id)
@@ -86,14 +131,13 @@ export default class PaymentsController {
             return response.ok({
                 status: 'success',
                 message: 'Paiement supprimé avec succès',
-                data: null,
             })
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la suppression du paiement')
         }
     }
 
-    // 6. Paiements liés à un abonnement
+    // Paiements d’un abonnement
     async bySubscription({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -113,7 +157,7 @@ export default class PaymentsController {
         }
     }
 
-    // 7. Total payé pour un abonnement
+    // Total payé pour un abonnement
     async totalBySubscription({ params, response }: HttpContext) {
         try {
             const total = await Payment.query()
@@ -122,22 +166,18 @@ export default class PaymentsController {
 
             return response.ok({
                 status: 'success',
-                message: 'Total des paiements pour cet abonnement récupéré avec succès',
+                message: 'Total des paiements récupéré avec succès',
                 data: {
                     subscriptionId: params.id,
                     total: Number(total[0].$extras.total) || 0,
                 },
             })
         } catch (error) {
-            return handleError(
-                response,
-                error,
-                'Erreur lors du calcul du total des paiements de l’abonnement',
-            )
+            return handleError(response, error, 'Erreur lors du calcul du total')
         }
     }
 
-    //  8. Changer uniquement le statut d’un paiement
+    // Changer le statut
     async updateStatus({ params, request, response }: HttpContext) {
         try {
             const payment = await Payment.findOrFail(params.id)
@@ -159,15 +199,11 @@ export default class PaymentsController {
                 data: payment,
             })
         } catch (error) {
-            return handleError(
-                response,
-                error,
-                'Erreur lors de la mise à jour du statut du paiement',
-            )
+            return handleError(response, error, 'Erreur lors de la mise à jour du statut')
         }
     }
 
-    // 📌 9. Rechercher un paiement par référence bancaire
+    // Rechercher par référence bancaire
     async searchByReference({ params, response }: HttpContext) {
         try {
             const payment = await Payment.query()
@@ -184,7 +220,7 @@ export default class PaymentsController {
 
             return response.ok({
                 status: 'success',
-                message: 'Paiement récupéré avec succès',
+                message: 'Paiement trouvé',
                 data: payment,
             })
         } catch (error) {
@@ -192,7 +228,8 @@ export default class PaymentsController {
         }
     }
 
-    public async byStudentPeriod({ params, request, response }: HttpContext) {
+    // Paiements d’un étudiant selon période
+    async byStudentPeriod({ params, request, response }: HttpContext) {
         try {
             const studentId = Number(params.studentId)
             const period = (request.input('period') || 'day') as Period
@@ -212,25 +249,16 @@ export default class PaymentsController {
 
             return response.ok({
                 status: 'success',
-                message: `Paiements de l’étudiant ${studentId} pour la période ${period} récupérés avec succès`,
-                data: {
-                    studentId,
-                    period,
-                    range: { start: start.toISO(), end: end.toISO() },
-                    payments,
-                },
+                message: `Paiements de l’étudiant ${studentId} récupérés avec succès`,
+                data: { payments, range: { start: start.toISO(), end: end.toISO() } },
             })
         } catch (error) {
-            return handleError(
-                response,
-                error,
-                'Erreur lors de la récupération des paiements de l’étudiant',
-            )
+            return handleError(response, error, 'Erreur lors de la récupération des paiements')
         }
     }
 
-    // 📌 11. Résumé des paiements d’un étudiant (total + count) par période
-    public async summaryByStudentPeriod({ params, request, response }: HttpContext) {
+    // 11 Résumé des paiements par période
+    async summaryByStudentPeriod({ params, request, response }: HttpContext) {
         try {
             const studentId = Number(params.studentId)
             const period = (request.input('period') || 'day') as Period
@@ -244,29 +272,22 @@ export default class PaymentsController {
 
             return response.ok({
                 status: 'success',
-                message: `Résumé des paiements de l’étudiant ${studentId} pour la période ${period} récupéré avec succès`,
+                message: `Résumé récupéré avec succès`,
                 data: {
-                    studentId,
-                    period,
-                    range: { start: start.toISO(), end: end.toISO() },
                     total: Number(rows[0].$extras.total ?? 0),
                     count: Number(rows[0].$extras.count ?? 0),
+                    range: { start: start.toISO(), end: end.toISO() },
                 },
             })
         } catch (error) {
-            return handleError(
-                response,
-                error,
-                'Erreur lors de la récupération du résumé des paiements de l’étudiant',
-            )
+            return handleError(response, error, 'Erreur lors du résumé des paiements')
         }
     }
 
-    // 12. Dashboard complet : jour, semaine, mois, année
+    // Dashboard global
     async dashboard({ request, response }: HttpContext) {
         try {
             const periods: Period[] = [Period.Day, Period.Week, Period.Month, Period.Year]
-
             const page = request.input('page', 1)
             const limit = 10
 
@@ -279,8 +300,6 @@ export default class PaymentsController {
                         .preload('subscription', (q) => q.preload('student'))
                         .orderBy('date', 'desc')
                         .paginate(page, limit)
-
-                    payments.baseUrl(request.url())
 
                     const rows = await Payment.query()
                         .whereBetween('date', [start.toSQL()!, end.toSQL()!])
@@ -300,16 +319,10 @@ export default class PaymentsController {
             return response.ok({
                 status: 'success',
                 message: 'Dashboard global des paiements généré avec succès',
-                data: {
-                    summary: results,
-                },
+                data: { summary: results },
             })
         } catch (error) {
-            return handleError(
-                response,
-                error,
-                'Erreur lors de la génération du dashboard global des paiements',
-            )
+            return handleError(response, error, 'Erreur lors du dashboard des paiements')
         }
     }
 }
