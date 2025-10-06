@@ -60,7 +60,8 @@ export default class PaymentsController {
             }
 
             const payment = await Payment.create({
-                subscriptionId: payload.subscriptionId ?? null,
+                reservationId: payload.reservationId,
+                subscriptionId: null,
                 reference: payload.reference,
                 amount: payload.amount,
                 date: DateTime.now(),

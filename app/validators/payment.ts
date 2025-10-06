@@ -11,7 +11,7 @@ import { DateTime } from 'luxon'
  */
 export const createPaymentValidator = vine.compile(
     vine.object({
-        subscriptionId: vine.number().positive(),
+        reservationId: vine.number().positive().optional(),
         amount: vine.number().min(1),
         reference: vine.string().trim().minLength(5),
     }),
