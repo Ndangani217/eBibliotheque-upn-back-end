@@ -429,7 +429,7 @@ router
 // -------------------------
 router
     .group(() => {
-        // Dashboard global
+        /** 1️⃣ Dashboard global (admin & manager) */
         router
             .get('/dashboard', [PaymentsController, 'dashboard'])
             .middleware([
@@ -438,7 +438,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // 🔍 Recherche par référence bancaire
+        /** 2️⃣ Recherche d’un paiement par référence */
         router
             .get('/reference/:reference', [PaymentsController, 'searchByReference'])
             .middleware([
@@ -447,7 +447,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // Paiements d’un abonnement
+        /** 3️⃣ Paiements liés à un abonnement */
         router
             .get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
             .middleware([
@@ -456,7 +456,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // Total des paiements d’un abonnement
+        /** 4️⃣ Total des paiements d’un abonnement */
         router
             .get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
             .middleware([
@@ -465,7 +465,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        //Paiements d’un étudiant par période
+        /** 5️⃣ Paiements d’un étudiant par période */
         router
             .get('/students/:studentId/payments/period', [PaymentsController, 'byStudentPeriod'])
             .middleware([
@@ -474,7 +474,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        //Résumé des paiements par période
+        /** 6️⃣ Résumé des paiements d’un étudiant par période */
         router
             .get('/students/:studentId/payments/summary', [
                 PaymentsController,
@@ -486,7 +486,16 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // Liste générale
+        /** 7️⃣ Tous les paiements d’un étudiant (historique complet) */
+        router
+            .get('/students/:studentId/payments', [PaymentsController, 'byStudent'])
+            .middleware([
+                middleware.auth(),
+                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
+                middleware.checkBlocked(),
+            ])
+
+        /** 8️⃣ Liste globale paginée (admin & manager) */
         router
             .get('/', [PaymentsController, 'getAllPayments'])
             .middleware([
@@ -495,7 +504,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        //Création d’un paiement
+        /** 9️⃣ Création d’un paiement (étudiant ou manager) */
         router
             .post('/', [PaymentsController, 'create'])
             .middleware([
@@ -504,7 +513,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // 🔎 Détails d’un paiement
+        /** 🔟 Détails d’un paiement spécifique */
         router
             .get('/:id', [PaymentsController, 'getById'])
             .middleware([
@@ -513,7 +522,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // Mise à jour
+        /** 11️⃣ Mise à jour d’un paiement (manager/admin) */
         router
             .put('/:id', [PaymentsController, 'update'])
             .middleware([
@@ -522,7 +531,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        //Changement de statut
+        /** 12️⃣ Mise à jour du statut (validation/rejet) */
         router
             .patch('/:id/status', [PaymentsController, 'updateStatus'])
             .middleware([
@@ -531,7 +540,7 @@ router
                 middleware.checkBlocked(),
             ])
 
-        // Suppression d’un paiement
+        /** 13️⃣ Suppression d’un paiement (manager/admin) */
         router
             .delete('/:id', [PaymentsController, 'destroy'])
             .middleware([

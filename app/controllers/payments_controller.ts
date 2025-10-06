@@ -15,11 +15,65 @@ export default class PaymentsController {
     /** Récupère tous les paiements (avec filtre optionnel par statut) */
     async getAllPayments({ request, response }: HttpContext) {
         try {
+            const page = Number(request.input('page', 1))
+            const limit = Number(request.input('limit', 10))
             const status = request.input('status')
-            const query = Payment.query().preload('subscription')
-            if (status) query.where('status', status)
-            const payments = await query
+
+            const query = Payment.query()
+                .preload('reservation', (res) => res.preload('student').preload('room'))
+                .preload('subscription', (sub) => sub.preload('student').preload('room'))
+                .orderBy('created_at', 'desc')
+
+            if (status) {
+                query.where('status', status)
+            }
+
+            const payments = await query.paginate(page, limit)
+            payments.baseUrl('/payments')
+
+            return response.ok({
+                status: 'success',
+                message: 'Liste des paiements récupérée avec succès',
+                data: payments,
+            })
+
             return response.ok({ status: 'success', data: payments })
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors de la récupération des paiements')
+        }
+    }
+
+    // Récupérer tous les paiements liés à un étudiant
+    async byStudent({ params, response }: HttpContext) {
+        try {
+            const studentId = Number(params.studentId)
+
+            if (!studentId) {
+                return response.badRequest({
+                    status: 'error',
+                    message: 'ID étudiant manquant ou invalide',
+                })
+            }
+            const payments = await Payment.query()
+                .whereHas('reservation', (resQuery) => {
+                    resQuery.where('student_id', studentId)
+                })
+                .orWhereHas('subscription', (subQuery) => {
+                    subQuery.where('student_id', studentId)
+                })
+                .preload('reservation', (res) => {
+                    res.preload('room')
+                })
+                .preload('subscription', (sub) => {
+                    sub.preload('room')
+                })
+                .orderBy('created_at', 'desc')
+
+            return response.ok({
+                status: 'success',
+                message: 'Paiements récupérés avec succès',
+                data: payments,
+            })
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la récupération des paiements')
         }
