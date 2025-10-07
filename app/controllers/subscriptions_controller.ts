@@ -5,15 +5,52 @@ import { HandleError as handleError } from '#helpers/handleError'
 import { DateTime } from 'luxon'
 import { getExpiryRange } from '#helpers/dateRange'
 import type { Period } from '#types/period'
+import { SubscriptionStatus } from '#types/subscriptionStatus'
 
 export default class SubscriptionsController {
-    /** Récupère tous les abonnements avec leurs relations (étudiant, chambre, paiements) */
-    async getAllSubscriptions({ response }: HttpContext) {
+    /** 🔹 Abonnement de l’étudiant connecté */
+    async me({ auth, response }: HttpContext) {
         try {
+            const user = auth.user
+            if (!user) return response.unauthorized({ message: 'Non authentifié' })
+
+            const subscription = await Subscription.query()
+                .where('student_id', user.id)
+                .preload('room', (r) => r.preload('students'))
+                .preload('payments')
+                .first()
+
+            if (!subscription) {
+                return response.notFound({
+                    status: 'error',
+                    message: 'Aucun abonnement trouvé pour cet étudiant',
+                })
+            }
+
+            return response.ok({
+                status: 'success',
+                message: 'Abonnement récupéré avec succès',
+                data: subscription,
+            })
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors de la récupération de l’abonnement')
+        }
+    }
+
+    /** 🔹 Récupère tous les abonnements (avec pagination) */
+    async getAllSubscriptions({ request, response }: HttpContext) {
+        try {
+            const page = request.input('page', 1)
+            const limit = request.input('limit', 10)
+
             const subscriptions = await Subscription.query()
                 .preload('student')
                 .preload('room')
                 .preload('payments')
+                .orderBy('created_at', 'desc')
+                .paginate(page, limit)
+
+            subscriptions.baseUrl(request.url())
 
             return response.ok({
                 status: 'success',
@@ -25,7 +62,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Récupère un abonnement spécifique via son ID */
+    /** 🔹 Récupère un abonnement par ID */
     async getByIdSubscription({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -45,7 +82,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Crée un nouvel abonnement (validation et insertion) */
+    /** 🔹 Crée un nouvel abonnement */
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createSubscriptionValidator)
@@ -61,7 +98,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Met à jour un abonnement existant */
+    /** 🔹 Met à jour un abonnement */
     async update({ params, request, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -80,7 +117,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Supprime un abonnement existant par son ID */
+    /** 🔹 Supprime un abonnement */
     async delete({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.findOrFail(params.id)
@@ -95,7 +132,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Récupère tous les paiements liés à un abonnement */
+    /** 🔹 Liste les paiements liés à un abonnement */
     async payments({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -105,7 +142,7 @@ export default class SubscriptionsController {
 
             return response.ok({
                 status: 'success',
-                message: 'Paiements liés à l’abonnement récupérés avec succès',
+                message: 'Paiements récupérés avec succès',
                 data: subscription.payments,
             })
         } catch (error) {
@@ -113,7 +150,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Récupère les abonnements expirant bientôt selon une période donnée (jour/semaine/mois/année) */
+    /** 🔹 Abonnements expirant bientôt */
     async expiring({ request, response }: HttpContext) {
         try {
             const period = request.input('period', 'day') as Period
@@ -134,13 +171,8 @@ export default class SubscriptionsController {
 
             return response.ok({
                 status: 'success',
-                message: `Abonnements expirant dans ${offset} ${period}(s) récupérés avec succès`,
-                data: {
-                    period,
-                    offset,
-                    range: { start: start.toISO(), end: end.toISO() },
-                    subscriptions,
-                },
+                message: `Abonnements expirant dans ${offset} ${period}(s)`,
+                data: subscriptions,
             })
         } catch (error) {
             return handleError(
@@ -151,18 +183,17 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Récupère les abonnements selon leur statut (actif, expiré, suspendu) */
+    /** 🔹 Abonnements par statut */
     async byStatus({ request, response }: HttpContext) {
         try {
             const status = request.input('status')
-
-            if (!['actif', 'expiré', 'suspendu'].includes(status)) {
+            const validStatuses = Object.values(SubscriptionStatus)
+            if (!validStatuses.includes(status)) {
                 return response.badRequest({
                     status: 'error',
-                    message: 'Statut invalide. Utilisez: actif, expiré ou suspendu',
+                    message: `Statut invalide. Utilisez : ${validStatuses.join(', ')}`,
                 })
             }
-
             const page = request.input('page', 1)
             const limit = 10
 
@@ -190,7 +221,7 @@ export default class SubscriptionsController {
         }
     }
 
-    /** Calcule le temps restant d’un abonnement (en jours, semaines, mois) */
+    /** 🔹 Temps restant avant expiration */
     async remainingTime({ params, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
@@ -202,29 +233,17 @@ export default class SubscriptionsController {
             const now = DateTime.now()
             const end = DateTime.fromJSDate(subscription.endDate as unknown as Date)
 
-            if (end < now) {
-                return response.ok({
-                    status: 'success',
-                    message: `L’abonnement ${subscription.reference} est déjà expiré`,
-                    data: {
-                        subscriptionId: subscription.id,
-                        remaining: { months: 0, weeks: 0, days: 0 },
-                    },
-                })
-            }
-
-            const diffDays = Math.floor(end.diff(now, 'days').days || 0)
+            const diffDays = Math.max(0, Math.floor(end.diff(now, 'days').days))
             const diffWeeks = Math.floor(diffDays / 7)
-            const diffMonths = Math.floor(end.diff(now, 'months').months || 0)
+            const diffMonths = Math.max(0, Math.floor(end.diff(now, 'months').months))
 
             return response.ok({
                 status: 'success',
-                message: `Temps restant pour l’abonnement ${subscription.reference}`,
+                message: 'Temps restant calculé avec succès',
                 data: {
                     subscriptionId: subscription.id,
                     student: subscription.student,
                     room: subscription.room,
-                    endDate: subscription.endDate,
                     remaining: { months: diffMonths, weeks: diffWeeks, days: diffDays },
                 },
             })

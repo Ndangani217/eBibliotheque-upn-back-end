@@ -179,32 +179,57 @@ export default class UsersController {
         }
     }
 
-    async getManagers({ response }: HttpContext) {
+    async getManagers({ request, response }: HttpContext) {
         try {
-            const managers = await User.query()
+            const page = Number(request.input('page', 1))
+            const limit = Number(request.input('limit', 10))
+            const search = request.input('search', '')
+            const status = request.input('status', 'all')
+
+            const query = User.query()
                 .where('role', Role.MANAGER)
                 .andWhere('is_verified', true)
                 .preload('sessions', (q) => q.orderBy('login_at', 'desc').limit(1))
 
-            const data = managers.map((m) => {
-                const s = m.sessions?.[0]
-                const online = !!s && s.logoutAt === null
-                const lastConnection = s ? (s.logoutAt ?? s.loginAt) : null
+            if (status === 'active') {
+                query.where('is_blocked', false)
+            } else if (status === 'blocked') {
+                query.where('is_blocked', true)
+            }
+
+            if (search) {
+                query.where((q) => {
+                    q.whereILike('first_name', `%${search}%`)
+                        .orWhereILike('name', `%${search}%`)
+                        .orWhereILike('last_name', `%${search}%`)
+                        .orWhereILike('email', `%${search}%`)
+                        .orWhereILike('phone_number', `%${search}%`)
+                })
+            }
+
+            const managers = await query.paginate(page, limit)
+
+            const formattedData = managers.all().map((m) => {
+                const session = m.sessions?.[0]
+                const online = !!session && session.logoutAt === null
+                const lastConnection = session ? (session.logoutAt ?? session.loginAt) : null
 
                 const base = m.serialize()
                 delete (base as any).sessions
 
-                return {
-                    ...base,
-                    online,
-                    lastConnection,
-                }
+                return { ...base, online, lastConnection }
             })
 
             return response.ok({
                 status: 'success',
-                message: 'Managers récupérés avec statut',
-                data,
+                message: 'Liste des managers filtrée avec succès',
+                data: formattedData,
+                meta: {
+                    total: managers.total,
+                    per_page: managers.perPage,
+                    current_page: managers.currentPage,
+                    last_page: managers.lastPage,
+                },
             })
         } catch (error) {
             return handleError(response, error, 'Impossible de récupérer les managers')

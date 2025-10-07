@@ -7,6 +7,7 @@ import { Role } from '#types/role'
 import { ReservationStatus } from '#types/reservationStatus'
 import { createReservationValidator, updateReservationValidator } from '#validators/reservation'
 import { Status } from '#types/roomStatus'
+import { HandleError } from '#helpers/handleError'
 
 export default class ReservationsController {
     /**
@@ -15,8 +16,6 @@ export default class ReservationsController {
     async create({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(createReservationValidator)
-
-            // Vérifier si l'étudiant existe et a le rôle STUDENT
             const student = await User.find(payload.studentId)
             if (!student || student.role !== Role.STUDENT) {
                 return response.badRequest({
@@ -24,8 +23,6 @@ export default class ReservationsController {
                     message: 'Utilisateur invalide, seul un étudiant peut réserver',
                 })
             }
-
-            // Vérifier si l’étudiant a déjà une réservation en attente ou approuvée
             const existingReservation = await Reservation.query()
                 .where('student_id', payload.studentId)
                 .whereIn('status', [ReservationStatus.EN_ATTENTE, ReservationStatus.APPROUVEE])
@@ -40,7 +37,6 @@ export default class ReservationsController {
                 })
             }
 
-            // Vérifier si la chambre est dispo
             const room = await Room.find(payload.roomId)
             if (!room || !room.isAvailable || room.availableSpots <= 0) {
                 return response.badRequest({
@@ -62,11 +58,7 @@ export default class ReservationsController {
                 data: reservation,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Impossible de créer la réservation',
-            })
+            return HandleError(response, error, 'Impossible de créer la réservation')
         }
     }
 
@@ -93,11 +85,7 @@ export default class ReservationsController {
                 meta: reservations.toJSON().meta,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Impossible de récupérer les réservations',
-            })
+            return HandleError(response, error, 'Impossible de récupérer les réservations')
         }
     }
 
@@ -128,11 +116,7 @@ export default class ReservationsController {
                 data: reservations,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Impossible de récupérer les réservations',
-            })
+            return HandleError(response, error, 'Impossible de récupérer les réservations')
         }
     }
 
@@ -160,10 +144,7 @@ export default class ReservationsController {
                 data: reservation,
             })
         } catch (error) {
-            return response.notFound({
-                status: 'error',
-                message: 'Réservation non trouvée',
-            })
+            return HandleError(response, error, 'Réservation non trouvée')
         }
     }
 
@@ -191,11 +172,7 @@ export default class ReservationsController {
                 data: reservation,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Erreur lors de la récupération de la réservation',
-            })
+            return HandleError(response, error, 'Erreur lors de la récupération de la réservation')
         }
     }
 
@@ -223,11 +200,7 @@ export default class ReservationsController {
                 data: reservation,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Impossible de mettre à jour la réservation',
-            })
+            return HandleError(response, error, 'Impossible de mettre à jour la réservation')
         }
     }
 
@@ -279,11 +252,7 @@ export default class ReservationsController {
                 data: { reservation, room },
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Échec de l’approbation de la réservation',
-            })
+            return HandleError(response, error, 'Échec de l’approbation de la réservation')
         }
     }
 
@@ -305,11 +274,7 @@ export default class ReservationsController {
                 data: reservation,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Échec du refus de la réservation',
-            })
+            return HandleError(response, error, 'Échec du refus de la réservation')
         }
     }
 
@@ -326,10 +291,7 @@ export default class ReservationsController {
                 message: 'Réservation supprimée avec succès',
             })
         } catch (error) {
-            return response.notFound({
-                status: 'error',
-                message: 'Réservation non trouvée',
-            })
+            return HandleError(response, error, 'Réservation non trouvée')
         }
     }
 
@@ -376,11 +338,7 @@ export default class ReservationsController {
                 data: reservation,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Échec de l’annulation de la réservation',
-            })
+            return HandleError(response, error, 'Échec de l’annulation de la réservation')
         }
     }
 
@@ -415,11 +373,7 @@ export default class ReservationsController {
                 meta: reservations.toJSON().meta,
             })
         } catch (error) {
-            console.error(error)
-            return response.internalServerError({
-                status: 'error',
-                message: 'Erreur lors de la recherche des réservations',
-            })
+            return HandleError(response, error, 'Erreur lors de la recherche des réservations')
         }
     }
 }

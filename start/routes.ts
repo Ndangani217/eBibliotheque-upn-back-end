@@ -594,6 +594,10 @@ router
 
 router
     .group(() => {
+        router
+            .get('/students/me/subscription', [SubscriptionsController, 'me'])
+            .middleware([middleware.auth()])
+
         // Récupérer tous les abonnements
         router
             .get('/', [SubscriptionsController, 'getAllSubscriptions'])
