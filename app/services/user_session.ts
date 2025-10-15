@@ -5,53 +5,68 @@ import UserSession from '#models/user_session'
 import type { HttpContext } from '@adonisjs/core/http'
 
 class UserSessionService {
-    /** Démarre une session (login) */
+    /**
+     * 🔹 Démarre une session (login)
+     */
     async start(user: User, ctx: HttpContext) {
         const ip = ctx.request.ip()
-        // Option : fermer toute session restée "ouverte" (logout_at null)
+        const device = ctx.request.header('user-agent') ?? 'Inconnu'
+
+        // Fermer toute session restée ouverte
         await UserSession.query()
             .where('user_id', user.id)
-            .whereNull('logout_at')
-            .update({ logoutAt: DateTime.now() })
+            .whereNull('logged_out_at')
+            .update({ loggedOutAt: DateTime.now(), isActive: false })
 
+        // Créer une nouvelle session
         return await UserSession.create({
-            userId: String(user.id),
-            loginAt: DateTime.now(),
-            logoutAt: null,
-            ip,
+            userId: user.id,
+            sessionToken: crypto.randomUUID(),
+            ipAddress: ip,
+            deviceInfo: device,
+            loggedInAt: DateTime.now(),
+            isActive: true,
         })
     }
 
-    /** Termine la session en cours (logout) */
-    async end(userId: number) {
+    /**
+     *  Termine la session en cours (logout)
+     */
+    async end(userId: string) {
         const open = await UserSession.query()
             .where('user_id', userId)
-            .whereNull('logout_at')
-            .orderBy('login_at', 'desc')
+            .andWhere('is_active', true)
+            .orderBy('logged_in_at', 'desc')
             .first()
 
         if (open) {
-            open.logoutAt = DateTime.now()
+            open.isActive = false
+            open.loggedOutAt = DateTime.now()
             await open.save()
         }
     }
 
-    /** Renvoie true si au moins une session ouverte */
-    async isOnline(userId: number) {
+    /**
+     *  Vérifie si l’utilisateur a au moins une session active
+     */
+    async isOnline(userId: string): Promise<boolean> {
         const count = await UserSession.query()
             .where('user_id', userId)
-            .whereNull('logout_at')
+            .andWhere('is_active', true)
             .count('* as total')
 
         return Number(count[0].$extras.total ?? 0) > 0
     }
 
-    /** Dernière session (pour dernier horaire) */
-    public async lastSession(userId: number) {
+    /**
+     *  Récupère la dernière session ouverte (pour afficher le dernier login)
+     */
+    async lastSession(userId: string) {
         return await UserSession.query()
             .where('user_id', userId)
-            .orderBy('login_at', 'desc')
+            .orderBy('logged_in_at', 'desc')
             .first()
     }
 }
+
 export default new UserSessionService()

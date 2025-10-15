@@ -1,3 +1,4 @@
+// app/controllers/auth_controller.ts
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import crypto from 'node:crypto'
@@ -13,8 +14,7 @@ import {
 
 export default class AuthController {
     /**
-     * POST /auth/login
-     * Authentifie l’utilisateur et crée une session
+     * 🔹 POST /auth/login
      */
     async storeSession({ request, auth, response }: HttpContext) {
         try {
@@ -45,8 +45,7 @@ export default class AuthController {
     }
 
     /**
-     * DELETE /auth/logout
-     * Termine la session de l’utilisateur connecté
+     * 🔹 DELETE /auth/logout
      */
     async destroySession({ auth, response }: HttpContext) {
         try {
@@ -63,8 +62,7 @@ export default class AuthController {
     }
 
     /**
-     * GET /auth/me
-     * Renvoie les infos de l’utilisateur authentifié
+     * 🔹 GET /auth/me
      */
     async showAuthenticatedUser({ auth, response }: HttpContext) {
         try {
@@ -84,8 +82,7 @@ export default class AuthController {
     }
 
     /**
-     * POST /auth/activate/:id
-     * Active un compte et définit le mot de passe initial
+     * 🔹 POST /auth/activate/:id
      */
     async activateAccount({ params, request, response }: HttpContext) {
         try {
@@ -120,15 +117,13 @@ export default class AuthController {
     }
 
     /**
-     * POST /auth/forgot-password
-     * Envoie un lien de réinitialisation
+     * 🔹 POST /auth/forgot-password
      */
     async requestPasswordReset({ request, response }: HttpContext) {
         try {
             const { email } = await request.validateUsing(RequestPasswordResetValidator)
             const user = await User.findBy('email', email)
 
-            // Réponse générique pour éviter la fuite d’infos
             if (!user)
                 return response.ok({
                     status: 'success',
@@ -155,8 +150,7 @@ export default class AuthController {
     }
 
     /**
-     * POST /auth/reset-password/:token
-     * Réinitialise le mot de passe
+     * 🔹 POST /auth/reset-password/:token
      */
     async resetPassword({ params, request, response }: HttpContext) {
         try {
@@ -175,6 +169,7 @@ export default class AuthController {
             user.resetToken = null
             user.resetExpires = null
             await user.save()
+            await UserSessionService.end(user.id)
 
             return response.ok({
                 status: 'success',
