@@ -1,15 +1,15 @@
+// app/Models/User.ts
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { Role } from '#types/role'
-import Faculty from '#models/faculty'
-import UserSession from '#models/user_session'
-import { Promotion } from '#types/promotion'
-import { Gender } from '#types/gender'
+import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { UserRole, SubscriberCategory } from '#enums/library_enums'
+import Notification from '#models/notification'
+import Subscription from '#models/subscription'
+import PaymentVoucher from '#models/payment_voucher'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
     uids: ['email'],
@@ -18,82 +18,69 @@ const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
 
 export default class User extends compose(BaseModel, AuthFinder) {
     @column({ isPrimary: true })
-    declare id: number
+    declare id: string
 
-    @column({ columnName: 'first_name', serializeAs: 'firstName' })
-    declare firstName: string
-
+    /** Informations personnelles */
     @column()
     declare name: string
 
-    @column({ columnName: 'last_name', serializeAs: 'lastName' })
+    @column()
     declare lastName: string
 
     @column()
-    declare gender: Gender
-
-    @column({ columnName: 'phone_number', serializeAs: 'phoneNumber' })
-    declare phoneNumber: string
-
-    @column({ columnName: 'faculty_id', serializeAs: 'facultyId' })
-    declare facultyId: number | null
-
-    @belongsTo(() => Faculty, {
-        foreignKey: 'facultyId',
-        localKey: 'id',
-    })
-    declare faculty: BelongsTo<typeof Faculty>
-
-    @column()
-    declare department: string
-
-    @column()
-    declare promotion: Promotion
+    declare firstName: string
 
     @column()
     declare email: string
 
-    @column()
-    declare role: Role
-
     @column({ serializeAs: null })
     declare password: string
 
-    @column({ columnName: 'photo_url', serializeAs: 'photoUrl' })
-    declare photoUrl: string
+    @column()
+    declare phoneNumber: string
 
+    /**  Statuts du compte */
     @column({ columnName: 'is_verified', serializeAs: 'isVerified' })
     declare isVerified: boolean
 
     @column({ columnName: 'is_blocked', serializeAs: 'isBlocked' })
     declare isBlocked: boolean
 
-    @column({ columnName: 'verify_token', serializeAs: null })
-    declare verifyToken: string | null
+    /**  Rôle du compte (admin, manager, citizen, etc.) */
+    @column()
+    declare role: UserRole
 
-    @column({ columnName: 'reset_token', serializeAs: null })
-    declare resetToken: string | null
+    /**  Catégorie d’abonné (étudiant, chercheur, etc.) */
+    @column()
+    declare category: SubscriberCategory | null
 
-    @hasMany(() => UserSession)
-    declare sessions: HasMany<typeof UserSession>
+    /** Matricule pour étudiants */
+    @column()
+    declare matricule: string | null
 
-    @column.dateTime({ columnName: 'last_seen_at', serializeAs: 'lastSeenAt' })
-    declare lastSeenAt: DateTime | null
+    /**  Relations */
+    @hasMany(() => Notification)
+    declare notifications: HasMany<typeof Notification>
 
-    @column.dateTime({ columnName: 'reset_expires', serializeAs: null })
-    declare resetExpires: DateTime | null
+    @hasMany(() => Subscription)
+    declare subscriptions: HasMany<typeof Subscription>
 
-    @column.dateTime({ columnName: 'created_at', autoCreate: true })
+    @hasMany(() => PaymentVoucher)
+    declare paymentVouchers: HasMany<typeof PaymentVoucher>
+
+    /** Dates automatiques */
+    @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime
 
-    @column.dateTime({ columnName: 'updated_at', autoCreate: true, autoUpdate: true })
+    @column.dateTime({ autoCreate: true, autoUpdate: true })
     declare updatedAt: DateTime | null
 
+    /** Fournisseur de tokens d’accès JWT */
     static accessTokens = DbAccessTokensProvider.forModel(User, {
-        expiresIn: '30 days',
-        prefix: 'oat_',
+        expiresIn: '15 mins',
+        prefix: 'funda_',
         table: 'auth_access_tokens',
         type: 'auth_token',
-        tokenSecretLength: 160,
+        tokenSecretLength: 200,
     })
 }

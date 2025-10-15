@@ -1,41 +1,39 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasOne, hasMany } from '@adonisjs/lucid/orm'
+import { SubscriptionStatus } from '#enums/library_enums'
+import type { BelongsTo, HasOne, HasMany } from '@adonisjs/lucid/types/relations'
+import SubscriptionCard from '#models/subscription_card'
 import User from '#models/user'
-import Room from '#models/room'
-import Payment from '#models/payment'
-import { SubscriptionStatus } from '#types/subscriptionStatus'
+import PaymentVoucher from '#models/payment_voucher'
+import Notification from '#models/notification'
 
 export default class Subscription extends BaseModel {
     @column({ isPrimary: true })
-    declare id: number
+    declare id: string
 
-    @column()
-    declare studentId: number
-
-    @column()
-    declare roomId: number
-
-    @column.date()
+    @column.dateTime()
     declare startDate: DateTime
 
-    @column.date()
+    @column.dateTime()
     declare endDate: DateTime
 
     @column()
     declare status: SubscriptionStatus
 
-    @column()
-    declare reference: string
+    @belongsTo(() => PaymentVoucher)
+    declare paymentVoucher: BelongsTo<typeof PaymentVoucher>
 
-    @belongsTo(() => User, { foreignKey: 'studentId' })
-    declare student: BelongsTo<typeof User>
+    @belongsTo(() => User)
+    declare subscriber: BelongsTo<typeof User>
 
-    @belongsTo(() => Room, { foreignKey: 'roomId' })
-    declare room: BelongsTo<typeof Room>
+    @belongsTo(() => User)
+    declare validatedBy: BelongsTo<typeof User>
 
-    @hasMany(() => Payment, { foreignKey: 'subscriptionId' })
-    declare payments: HasMany<typeof Payment>
+    @hasOne(() => SubscriptionCard)
+    declare card: HasOne<typeof SubscriptionCard>
+
+    @hasMany(() => Notification)
+    declare notifications: HasMany<typeof Notification>
 
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime
