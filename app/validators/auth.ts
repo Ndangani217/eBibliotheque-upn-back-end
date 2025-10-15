@@ -5,10 +5,10 @@ import vine from '@vinejs/vine'
  * Route : POST /auth/login
  */
 export const LoginValidator = vine.compile(
-  vine.object({
-    email: vine.string().trim().email(),
-    password: vine.string().minLength(6),
-  })
+    vine.object({
+        email: vine.string().trim().email(),
+        password: vine.string().minLength(6),
+    }),
 )
 
 /**
@@ -16,10 +16,10 @@ export const LoginValidator = vine.compile(
  * Route : POST /auth/activate/:id
  */
 export const ActivateAccountValidator = vine.compile(
-  vine.object({
-    token: vine.string().trim(),
-    password: vine.string().minLength(6).confirmed(),
-  })
+    vine.object({
+        token: vine.string().trim(),
+        password: vine.string().minLength(6).confirmed(),
+    }),
 )
 
 /**
@@ -27,9 +27,9 @@ export const ActivateAccountValidator = vine.compile(
  * Route : POST /auth/forgot-password
  */
 export const RequestPasswordResetValidator = vine.compile(
-  vine.object({
-    email: vine.string().trim().email(),
-  })
+    vine.object({
+        email: vine.string().trim().email(),
+    }),
 )
 
 /**
@@ -37,7 +37,26 @@ export const RequestPasswordResetValidator = vine.compile(
  * Route : POST /auth/reset-password/:token
  */
 export const ResetPasswordValidator = vine.compile(
-  vine.object({
-    newPassword: vine.string().minLength(6).confirmed(),
-  })
+    vine.object({
+        newPassword: vine.string().minLength(6).confirmed(),
+    }),
+)
+
+export const RegisterSubscriberValidator = vine.compile(
+    vine.object({
+        firstName: vine.string().trim().minLength(2),
+        lastName: vine.string().trim().minLength(2),
+        email: vine.string().trim().email(),
+        phoneNumber: vine
+            .string()
+            .trim()
+            .regex(/^(?:\+243|0)?[0-9]{9}$/),
+        category: vine.string().trim(),
+    }),
+)
+
+export const SetPasswordValidator = vine.compile(
+    vine.object({
+        password: vine.string().minLength(6).confirmed(),
+    }),
 )
