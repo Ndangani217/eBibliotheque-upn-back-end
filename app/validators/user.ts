@@ -7,7 +7,6 @@ import { UserRole, SubscriberCategory } from '#enums/library_enums'
  */
 export const CreateUserValidator = vine.compile(
     vine.object({
-        name: vine.string().trim().minLength(2).maxLength(100),
         lastName: vine.string().trim().minLength(2).maxLength(100),
         firstName: vine.string().trim().minLength(2).maxLength(100),
         email: vine.string().trim().email().maxLength(254),
@@ -27,7 +26,6 @@ export const CreateUserValidator = vine.compile(
  */
 export const UpdateUserValidator = vine.compile(
     vine.object({
-        name: vine.string().trim().minLength(2).maxLength(100).optional(),
         lastName: vine.string().trim().minLength(2).maxLength(100).optional(),
         firstName: vine.string().trim().minLength(2).maxLength(100).optional(),
         email: vine.string().trim().email().maxLength(254).optional(),

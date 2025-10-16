@@ -1,53 +1,39 @@
 /*
 |--------------------------------------------------------------------------
-| HTTP kernel file
+| HTTP kernel
 |--------------------------------------------------------------------------
 */
 
 import router from '@adonisjs/core/services/router'
 import server from '@adonisjs/core/services/server'
-/*import '#tasks/reservationCron'
-import '#tasks/subscriptionCron'
 
 /**
- * Error handler
+ * Gestionnaire global des erreurs
  */
 server.errorHandler(() => import('#exceptions/handler'))
 
 /**
- * Middleware global (toujours exécuté sur toutes les requêtes avec une route)
- */ /*
-export const middleware = {
-    default: [
-        () => import('@adonisjs/core/bodyparser_middleware'),
-        () => import('#middleware/heartbeat_middleware'),
-    ],
-}*/
-
-/**
- * Middleware nommés (utilisables dans .middleware([...]) sur les routes)
- */ /*
-export const namedMiddleware = router.named({
-    auth: () => import('#middleware/auth_middleware'),
-    hasRole: () => import('#middleware/has_role_middleware'),
-    heartbeat: () => import('#middleware/heartbeat_middleware'),
-    checkBlocked: () => import('#middleware/check_blocked_middleware'),
-})*/
-
-/**
- * Middleware pour toutes les requêtes, même sans route correspondante
+ * ✅ Middleware appliqués à TOUTES les requêtes,
+ * même sans route correspondante (pré-vol, favicon, etc.)
  */
 server.use([
     () => import('#middleware/container_bindings_middleware'),
     () => import('#middleware/force_json_response_middleware'),
-    () => import('@adonisjs/cors/cors_middleware'),
+    () => import('@adonisjs/cors/cors_middleware'), // CORS global
 ])
 
 /**
- * Middleware appliqués à toutes les routes
+ * ✅ Middleware appliqués à toutes les routes déclarées
  */
 router.use([
-    () => import('@adonisjs/core/bodyparser_middleware'),
+    () => import('@adonisjs/core/bodyparser_middleware'), // 💥 indispensable pour lire le JSON
     () => import('@adonisjs/auth/initialize_auth_middleware'),
-    //() => import('#middleware/initialize_bouncer_middleware'),
+    // () => import('#middleware/initialize_bouncer_middleware'),
 ])
+
+/**
+ * ✅ Middleware nommés (utilisables dans .middleware([...]) sur une route spécifique)
+ */
+/*export const namedMiddleware = router.named({
+    heartbeat: () => import('#middleware/heartbeat_middleware'),
+})*/

@@ -9,8 +9,8 @@ import {
     LoginValidator,
     RequestPasswordResetValidator,
     ResetPasswordValidator,
+    SetPasswordValidator,
 } from '#validators/auth'
-import { RegisterSubscriberValidator, SetPasswordValidator } from '#validators/user'
 import env from '#start/env'
 import Mail from '@adonisjs/mail/services/main'
 
@@ -35,7 +35,7 @@ export default class AuthController {
             }
 
             const verifiedUser = await User.verifyCredentials(email, password)
-            const accessToken = await auth.use('api').createToken(verifiedUser) // ✅ correction ici
+            const accessToken = await auth.use('api').createToken(verifiedUser)
 
             const refreshToken = crypto.randomBytes(40).toString('hex')
             await RefreshToken.create({
@@ -95,87 +95,31 @@ export default class AuthController {
         }
     }
 
-    async registerSubscriber({ request, response }: HttpContext) {
+    async setPassword({ request, params, response }: HttpContext) {
         try {
-            const payload = await request.validateUsing(RegisterSubscriberValidator)
+            const token = params.token
+            const { newPassword } = await request.validateUsing(SetPasswordValidator)
 
-            const existing = await User.query()
-                .where('email', payload.email)
-                .orWhere('phone_number', payload.phoneNumber)
-                .first()
+            const hashedToken = crypto.createHash('sha256').update(token).digest('hex')
 
-            if (existing) {
-                return response.badRequest({
-                    status: 'error',
-                    message: 'A user with this email or phone number already exists.',
-                })
-            }
-
-            const user = await User.create({
-                ...payload,
-                isVerified: false,
-                isBlocked: false,
-            })
-
-            const rawToken = crypto.randomBytes(32).toString('hex')
-            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
-
-            user.verifyToken = hashed
-            user.resetExpires = DateTime.utc().plus({ hours: 24 })
-            await user.save()
-
-            const url = `${env.get('FRONT_URL')}/set-password?userId=${user.id}&token=${rawToken}`
-
-            await Mail.use('smtp').send((message) => {
-                message
-                    .from(
-                        env.get('MAIL_FROM_ADDRESS') as string,
-                        env.get('MAIL_FROM_NAME') as string,
-                    )
-                    .to(user.email)
-                    .subject('Activate your account')
-                    .htmlView('emails/activation', { user, url })
-            })
-
-            return response.created({
-                status: 'success',
-                message: 'Subscriber created. Please check your email to set your password.',
-            })
-        } catch (error) {
-            return handleError(response, error, 'Unable to register subscriber')
-        }
-    }
-
-    async setPassword({ request, response }: HttpContext) {
-        try {
-            const { userId, token, password } = await request.validateUsing(SetPasswordValidator)
-
-            const hashed = crypto.createHash('sha256').update(token).digest('hex')
             const user = await User.query()
-                .where('id', userId)
-                .andWhere('verify_token', hashed)
-                .andWhere('verify_expires', '>', DateTime.utc().toSQL())
+                .where('verify_token', hashedToken)
+                .where('verify_expires', '>', DateTime.utc().toSQL())
                 .first()
 
             if (!user) {
-                return response.badRequest({
-                    status: 'error',
-                    message: 'Invalid or expired activation link.',
-                })
+                return response.badRequest({ message: 'Lien invalide ou expiré.' })
             }
 
-            user.password = password
+            user.password = newPassword
             user.isVerified = true
             user.verifyToken = null
-            user.resetExpires = null
+            user.verifyExpires = null
             await user.save()
 
-            return response.ok({
-                status: 'success',
-                message: 'Password set successfully. You can now log in.',
-            })
+            return response.ok({ message: 'Mot de passe défini avec succès.' })
         } catch (error) {
-            return handleError(response, error, 'Unable to set password')
+            return handleError(response, error, 'Impossible de définir le mot de passe')
         }
     }
 
@@ -194,7 +138,7 @@ export default class AuthController {
             const rawToken = crypto.randomBytes(32).toString('hex')
             const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
             user.resetToken = hashed
-            user.resetExpires = DateTime.utc().plus({ hours: 1 })
+            user.verifyExpires = DateTime.utc().plus({ hours: 1 })
             await user.save()
 
             const resetUrl = `${env.get('FRONT_URL')}/reset-password/${rawToken}`
@@ -238,7 +182,7 @@ export default class AuthController {
 
             user.password = newPassword
             user.resetToken = null
-            user.resetExpires = null
+            user.verifyExpires = null
             await user.save()
 
             await UserSessionService.end(user.id)

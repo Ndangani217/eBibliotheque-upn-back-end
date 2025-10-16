@@ -12,17 +12,6 @@ export const LoginValidator = vine.compile(
 )
 
 /**
- * Validation pour l’activation du compte
- * Route : POST /auth/activate/:id
- */
-export const ActivateAccountValidator = vine.compile(
-    vine.object({
-        token: vine.string().trim(),
-        password: vine.string().minLength(6).confirmed(),
-    }),
-)
-
-/**
  * Validation pour la demande de réinitialisation de mot de passe
  * Route : POST /auth/forgot-password
  */
@@ -42,21 +31,12 @@ export const ResetPasswordValidator = vine.compile(
     }),
 )
 
-export const RegisterSubscriberValidator = vine.compile(
-    vine.object({
-        firstName: vine.string().trim().minLength(2),
-        lastName: vine.string().trim().minLength(2),
-        email: vine.string().trim().email(),
-        phoneNumber: vine
-            .string()
-            .trim()
-            .regex(/^(?:\+243|0)?[0-9]{9}$/),
-        category: vine.string().trim(),
-    }),
-)
-
+/**
+ * Validation pour l’activation de compte (définition du mot de passe)
+ * Route : POST /auth/set-password
+ */
 export const SetPasswordValidator = vine.compile(
     vine.object({
-        password: vine.string().minLength(6).confirmed(),
+        newPassword: vine.string().minLength(6).confirmed(),
     }),
 )

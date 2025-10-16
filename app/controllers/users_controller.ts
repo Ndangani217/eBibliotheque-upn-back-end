@@ -1,6 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
-import UserSession from '#models/user_session'
 import { handleError } from '#helpers/handle_error'
 import {
     CreateUserValidator,
@@ -15,7 +14,7 @@ import env from '#start/env'
 import Mail from '@adonisjs/mail/services/main'
 
 export default class UserController {
-    /** 🔹 List of verified users */
+    /** 🔹 Liste des utilisateurs vérifiés */
     async index({ request, response }: HttpContext) {
         try {
             const page = request.input('page', 1)
@@ -45,7 +44,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 List of unverified users */
+    /** 🔹 Liste des utilisateurs non vérifiés */
     async unverified({ request, response }: HttpContext) {
         try {
             const page = request.input('page', 1)
@@ -73,7 +72,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Get user details */
+    /** 🔹 Détails d’un utilisateur */
     async show({ params, response }: HttpContext) {
         try {
             const user = await User.query()
@@ -96,7 +95,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Create a generic user (by admin) */
+    /** 🔹 Création d’un utilisateur (admin) */
     async store({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(CreateUserValidator)
@@ -119,6 +118,30 @@ export default class UserController {
                 isBlocked: false,
             })
 
+            const rawToken = crypto.randomBytes(32).toString('hex')
+            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
+
+            user.verifyToken = hashed
+            user.verifyExpires = DateTime.utc().plus({ hours: 24 })
+            await user.save()
+
+            const url = `${env.get('FRONT_URL')}/set-password?userId=${user.id}&token=${rawToken}`
+            await Mail.use('smtp').send((message) => {
+                message
+                    .from(
+                        env.get('MAIL_FROM_ADDRESS') as string,
+                        env.get('MAIL_FROM_NAME') as string,
+                    )
+                    .to(user.email)
+                    .subject('Activation de votre compte')
+                    .htmlView('emails/activation', { user, url })
+            })
+
+            return response.created({
+                status: 'success',
+                message: 'Subscriber created. Please check your email to set your password.',
+            })
+
             return response.created({
                 status: 'success',
                 message: 'User created successfully',
@@ -129,8 +152,8 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Create a subscriber account (student or researcher) */
-    async createSubscriber({ request, response }: HttpContext) {
+    /** 🔹 Inscription d’un abonné (citoyen ou chercheur) */
+    async registerSubscriber({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(RegisterSubscriberValidator)
 
@@ -142,11 +165,11 @@ export default class UserController {
             if (existing) {
                 return response.badRequest({
                     status: 'error',
-                    message: 'A subscriber with this email or phone number already exists.',
+                    message: 'A user with this email or phone number already exists.',
                 })
             }
 
-            // Create user with role ABONNE
+            // Création avec nom complet automatique
             const user = await User.create({
                 ...payload,
                 role: UserRole.ABONNE,
@@ -154,17 +177,15 @@ export default class UserController {
                 isBlocked: false,
             })
 
-            // Generate a secure activation token valid for 24h
+            // Génération du token de vérification
             const rawToken = crypto.randomBytes(32).toString('hex')
             const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
 
             user.verifyToken = hashed
-            user.resetExpires = DateTime.utc().plus({ hours: 24 })
+            user.verifyExpires = DateTime.utc().plus({ hours: 24 })
             await user.save()
 
             const url = `${env.get('FRONT_URL')}/set-password?userId=${user.id}&token=${rawToken}`
-
-            // Send activation email
             await Mail.use('smtp').send((message) => {
                 message
                     .from(
@@ -172,21 +193,20 @@ export default class UserController {
                         env.get('MAIL_FROM_NAME') as string,
                     )
                     .to(user.email)
-                    .subject('Activate your account')
+                    .subject('Activation de votre compte')
                     .htmlView('emails/activation', { user, url })
             })
 
             return response.created({
                 status: 'success',
-                message: 'Subscriber created successfully. Activation link sent to email.',
-                data: user,
+                message: 'Subscriber created. Please check your email to set your password.',
             })
         } catch (error) {
-            return handleError(response, error, 'Unable to create subscriber')
+            return handleError(response, error, 'Unable to register subscriber')
         }
     }
 
-    /** 🔹 Update user */
+    /** 🔹 Mise à jour d’un utilisateur */
     async update({ params, request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(UpdateUserValidator)
@@ -209,7 +229,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Block a user */
+    /** 🔹 Blocage et déblocage d’utilisateur */
     async block({ params, response }: HttpContext) {
         try {
             const user = await User.find(params.id)
@@ -220,7 +240,6 @@ export default class UserController {
 
             user.isBlocked = true
             await user.save()
-
             await UserSessionService.end(user.id)
 
             return response.ok({
@@ -233,7 +252,6 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Unblock a user */
     async unblock({ params, response }: HttpContext) {
         try {
             const user = await User.find(params.id)
@@ -252,7 +270,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Delete user */
+    /** 🔹 Suppression d’un utilisateur */
     async destroy({ params, response }: HttpContext) {
         try {
             const user = await User.find(params.id)
@@ -269,24 +287,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 User session history */
-    async sessions({ params, response }: HttpContext) {
-        try {
-            const sessions = await UserSession.query()
-                .where('user_id', params.id)
-                .orderBy('logged_in_at', 'desc')
-
-            return response.ok({
-                status: 'success',
-                message: 'User session history retrieved',
-                data: sessions,
-            })
-        } catch (error) {
-            return handleError(response, error, 'Unable to retrieve sessions')
-        }
-    }
-
-    /** 🔹 User statistics */
+    /** 🔹 Statistiques utilisateurs */
     async stats({ response }: HttpContext) {
         try {
             const total = await User.query().count('* as total')
@@ -309,30 +310,6 @@ export default class UserController {
             })
         } catch (error) {
             return handleError(response, error, 'Unable to retrieve user statistics')
-        }
-    }
-
-    /** 🔹 Change user role */
-    async promote({ params, request, response }: HttpContext) {
-        try {
-            const { role } = request.only(['role'])
-            if (!Object.values(UserRole).includes(role)) {
-                return response.badRequest({ status: 'error', message: 'Invalid role provided.' })
-            }
-
-            const user = await User.find(params.id)
-            if (!user) return response.notFound({ status: 'error', message: 'User not found' })
-
-            user.role = role
-            await user.save()
-
-            return response.ok({
-                status: 'success',
-                message: `User promoted to role "${role}"`,
-                data: user,
-            })
-        } catch (error) {
-            return handleError(response, error, 'Unable to change user role')
         }
     }
 }

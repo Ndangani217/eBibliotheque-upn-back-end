@@ -2,35 +2,50 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
 import { UserRole, SubscriberCategory } from '#enums/library_enums'
 
-export default class extends BaseSchema {
+export default class CreateUsersTable extends BaseSchema {
     protected tableName = 'users'
 
-    async up() {
+    public async up() {
         this.schema.createTable(this.tableName, (table) => {
             table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))
 
-            table.string('name', 100).notNullable()
-            table.string('last_name', 100).notNullable()
             table.string('first_name', 100).notNullable()
+            table.string('last_name', 100).notNullable()
             table.string('email', 254).notNullable().unique()
             table.string('password').nullable()
-            table.string('phone_number').unique().notNullable()
-            table.string('verify_token').nullable()
-            table.string('reset_token').nullable()
+            table.string('phone_number', 20).notNullable().unique()
+
+            table.string('verify_token', 255).nullable()
+            table.timestamp('verify_expires').nullable()
+            table.string('reset_token', 255).nullable()
             table.timestamp('reset_expires').nullable()
+
             table.boolean('is_verified').notNullable().defaultTo(false)
             table.boolean('is_blocked').notNullable().defaultTo(false)
-            table.enum('role', Object.values(UserRole)).notNullable()
-            table.enum('category', Object.values(SubscriberCategory)).nullable()
 
-            table.string('matricule').nullable()
+            table
+                .enum('role', Object.values(UserRole), {
+                    useNative: true,
+                    enumName: 'user_role_enum',
+                })
+                .notNullable()
 
-            table.timestamp('created_at').notNullable().defaultTo(this.now())
-            table.timestamp('updated_at').nullable()
+            table
+                .enum('category', Object.values(SubscriberCategory), {
+                    useNative: true,
+                    enumName: 'subscriber_category_enum',
+                })
+                .nullable()
+
+            table.string('matricule', 50).nullable()
+
+            table.timestamps(true, true)
         })
     }
 
-    async down() {
+    public async down() {
         this.schema.dropTable(this.tableName)
+        this.schema.raw('DROP TYPE IF EXISTS user_role_enum')
+        this.schema.raw('DROP TYPE IF EXISTS subscriber_category_enum')
     }
 }
