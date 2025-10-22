@@ -14,7 +14,7 @@ import env from '#start/env'
 import Mail from '@adonisjs/mail/services/main'
 
 export default class UserController {
-    /** 🔹 Liste des utilisateurs vérifiés */
+    /** Liste des utilisateurs vérifiés */
     async index({ request, response }: HttpContext) {
         try {
             const page = request.input('page', 1)
@@ -44,7 +44,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Liste des utilisateurs non vérifiés */
+    /** Liste des utilisateurs non vérifiés */
     async unverified({ request, response }: HttpContext) {
         try {
             const page = request.input('page', 1)
@@ -72,7 +72,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Détails d’un utilisateur */
+    /** Détails d’un utilisateur */
     async show({ params, response }: HttpContext) {
         try {
             const user = await User.query()
@@ -95,7 +95,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Création d’un utilisateur (admin) */
+    /** Création d’un utilisateur (admin) */
     async store({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(CreateUserValidator)
@@ -141,22 +141,15 @@ export default class UserController {
                 status: 'success',
                 message: 'Subscriber created. Please check your email to set your password.',
             })
-
-            return response.created({
-                status: 'success',
-                message: 'User created successfully',
-                data: user,
-            })
         } catch (error) {
             return handleError(response, error, 'Unable to create user')
         }
     }
 
-    /** 🔹 Inscription d’un abonné (citoyen ou chercheur) */
+    /** Inscription d’un abonné (citoyen ou chercheur) */
     async registerSubscriber({ request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(RegisterSubscriberValidator)
-
             const existing = await User.query()
                 .where('email', payload.email)
                 .orWhere('phone_number', payload.phoneNumber)
@@ -172,7 +165,7 @@ export default class UserController {
             // Création avec nom complet automatique
             const user = await User.create({
                 ...payload,
-                role: UserRole.ABONNE,
+                role: UserRole.SUBSCRIBER,
                 isVerified: false,
                 isBlocked: false,
             })
@@ -206,7 +199,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Mise à jour d’un utilisateur */
+    /** Mise à jour d’un utilisateur */
     async update({ params, request, response }: HttpContext) {
         try {
             const payload = await request.validateUsing(UpdateUserValidator)
@@ -229,7 +222,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Blocage et déblocage d’utilisateur */
+    /** Blocage et déblocage d’utilisateur */
     async block({ params, response }: HttpContext) {
         try {
             const user = await User.find(params.id)
@@ -270,7 +263,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Suppression d’un utilisateur */
+    /** Suppression d’un utilisateur */
     async destroy({ params, response }: HttpContext) {
         try {
             const user = await User.find(params.id)
@@ -287,7 +280,7 @@ export default class UserController {
         }
     }
 
-    /** 🔹 Statistiques utilisateurs */
+    /** Statistiques utilisateurs */
     async stats({ response }: HttpContext) {
         try {
             const total = await User.query().count('* as total')

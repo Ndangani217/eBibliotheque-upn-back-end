@@ -76,25 +76,6 @@ export default class AuthController {
         }
     }
 
-    async showAuthenticatedUser({ auth, response }: HttpContext) {
-        try {
-            if (!auth.user) {
-                return response.unauthorized({ status: 'error', message: 'Not authenticated' })
-            }
-
-            if (auth.user.isBlocked) {
-                return response.forbidden({
-                    status: 'error',
-                    message: 'Your account is blocked. Please contact the administrator.',
-                })
-            }
-
-            return response.ok({ status: 'success', data: { user: auth.user } })
-        } catch (error) {
-            return handleError(response, error, 'Unable to fetch user profile')
-        }
-    }
-
     async setPassword({ request, params, response }: HttpContext) {
         try {
             const token = params.token
@@ -243,6 +224,38 @@ export default class AuthController {
             })
         } catch (error) {
             return handleError(response, error, 'Unable to refresh access token')
+        }
+    }
+
+    async showAuthenticatedUser({ auth, response }: HttpContext) {
+        try {
+            // Authentifie l'utilisateur via le guard "api"
+            const user = await auth.use('api').authenticate()
+
+            if (!user) {
+                return response.unauthorized({
+                    status: 'error',
+                    message: 'Non authentifié',
+                })
+            }
+
+            if (user.isBlocked) {
+                return response.forbidden({
+                    status: 'error',
+                    message: 'Votre compte est bloqué, contactez l’administration',
+                })
+            }
+
+            return response.ok({
+                status: 'success',
+                data: { user },
+            })
+        } catch (error) {
+            console.error('Auth error:', error)
+            return response.unauthorized({
+                status: 'error',
+                message: 'Token invalide ou expiré',
+            })
         }
     }
 }

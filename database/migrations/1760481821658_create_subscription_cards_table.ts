@@ -6,8 +6,10 @@ export default class extends BaseSchema {
     async up() {
         this.schema.createTable(this.tableName, (table) => {
             table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))
-            table.string('qr_code').notNullable()
-            table.string('file_path').notNullable()
+
+            table.string('unique_code').notNullable().unique()
+            table.string('qr_code_path').notNullable()
+            table.string('pdf_path').notNullable()
             table.timestamp('issued_at', { useTz: true }).notNullable()
             table.boolean('is_active').defaultTo(true)
 
@@ -17,8 +19,8 @@ export default class extends BaseSchema {
                 .inTable('subscriptions')
                 .onDelete('CASCADE')
 
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
+            table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
+            table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
         })
     }
 

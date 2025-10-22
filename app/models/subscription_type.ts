@@ -1,30 +1,34 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
-import Subscription from '#models/subscription'
+import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import PaymentVoucher from '#models/payment_voucher'
+import { SubscriptionDuration } from '#enums/library_enums'
 
-export default class SubscriptionCard extends BaseModel {
-  @column({ isPrimary: true })
-  declare id: string
+export default class SubscriptionType extends BaseModel {
+    @column({ isPrimary: true })
+    declare id: number
 
-  @column()
-  declare qrCode: string
+    @column()
+    declare category: string
 
-  @column()
-  declare filePath: string
+    @column({ columnName: 'duration_months' })
+    declare durationMonths: SubscriptionDuration
 
-  @column.dateTime()
-  declare issuedAt: DateTime
+    @column()
+    declare price: number
 
-  @column()
-  declare isActive: boolean
+    @column()
+    declare devise: string
 
-  @belongsTo(() => Subscription)
-  declare subscription: BelongsTo<typeof Subscription>
+    @column()
+    declare description?: string | null
 
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
+    @hasMany(() => PaymentVoucher)
+    declare paymentVouchers: HasMany<typeof PaymentVoucher>
 
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime
+    @column.dateTime({ autoCreate: true })
+    declare createdAt: DateTime
+
+    @column.dateTime({ autoCreate: true, autoUpdate: true })
+    declare updatedAt: DateTime
 }

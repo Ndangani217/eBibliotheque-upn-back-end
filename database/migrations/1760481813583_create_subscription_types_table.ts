@@ -1,21 +1,42 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
+import { VoucherStatus } from '#enums/library_enums'
 
 export default class extends BaseSchema {
-    protected tableName = 'subscription_types'
+    protected tableName = 'payment_vouchers'
 
     async up() {
         this.schema.createTable(this.tableName, (table) => {
             table.increments('id')
-            table.string('name', 100).notNullable().unique()
-            table.decimal('price', 10, 2).notNullable()
-            table.string('description').nullable()
 
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
+            table.string('reference_code', 100).notNullable().unique()
+            table.decimal('amount', 12, 2).notNullable()
+            table
+                .enum('status', Object.values(VoucherStatus), {
+                    useNative: true,
+                    enumName: 'voucher_status_enum',
+                })
+                .notNullable()
+
+            table.string('bank_receipt_number').nullable()
+            table.timestamp('validated_at', { useTz: true }).nullable()
+            table.uuid('subscriber_id').references('id').inTable('users').onDelete('CASCADE')
+
+            table
+                .integer('subscription_type_id')
+                .unsigned()
+                .references('id')
+                .inTable('subscription_types')
+                .onDelete('CASCADE')
+
+            table.string('qr_code').nullable()
+
+            table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
+            table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
         })
     }
 
     async down() {
         this.schema.dropTable(this.tableName)
+        this.schema.raw('DROP TYPE IF EXISTS voucher_status_enum')
     }
 }

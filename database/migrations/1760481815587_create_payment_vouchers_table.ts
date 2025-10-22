@@ -20,7 +20,7 @@ export default class extends BaseSchema {
                 .references('id')
                 .inTable('subscription_types')
                 .onDelete('CASCADE')
-
+            table.string('qr_code').nullable()
             table.timestamp('created_at')
             table.timestamp('updated_at')
         })

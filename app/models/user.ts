@@ -86,7 +86,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
     /** Fournisseur de tokens d’accès JWT */
     static accessTokens = DbAccessTokensProvider.forModel(User, {
-        expiresIn: '15 mins',
+        expiresIn: '30 days',
         prefix: 'funda_',
         table: 'auth_access_tokens',
         type: 'auth_token',

@@ -20,14 +20,27 @@ export default class Subscription extends BaseModel {
     @column()
     declare status: SubscriptionStatus
 
+    /** ✅ Clé étrangère vers le bon de paiement */
+    @column({ columnName: 'payment_voucher_id' })
+    declare paymentVoucherId: number
+
+    /** ✅ Clé étrangère vers l’abonné */
+    @column({ columnName: 'subscriber_id' })
+    declare subscriberId: string
+
+    /** ✅ Clé étrangère vers le validateur (administrateur, manager, etc.) */
+    @column({ columnName: 'validated_by' })
+    declare validatedBy: string | null
+
+    /** ✅ Relations */
     @belongsTo(() => PaymentVoucher)
     declare paymentVoucher: BelongsTo<typeof PaymentVoucher>
 
-    @belongsTo(() => User)
+    @belongsTo(() => User, { foreignKey: 'subscriberId' })
     declare subscriber: BelongsTo<typeof User>
 
-    @belongsTo(() => User)
-    declare validatedBy: BelongsTo<typeof User>
+    @belongsTo(() => User, { foreignKey: 'validatedBy' })
+    declare validator: BelongsTo<typeof User>
 
     @hasOne(() => SubscriptionCard)
     declare card: HasOne<typeof SubscriptionCard>
@@ -35,6 +48,7 @@ export default class Subscription extends BaseModel {
     @hasMany(() => Notification)
     declare notifications: HasMany<typeof Notification>
 
+    /** ✅ Dates automatiques */
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime
 
