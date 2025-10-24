@@ -3,6 +3,10 @@
     "compilerOptions": {
         "rootDir": "./",
         "outDir": "./build",
+        "moduleResolution": "NodeNext",
+        "module": "NodeNext",
+        "target": "ES2022",
+        "types": ["@adonisjs/core"],
         "paths": {
             "@ioc:Adonis/*": ["./adonis-typings/*"]
         }

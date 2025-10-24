@@ -16,14 +16,15 @@ import { randomUUID } from 'node:crypto'
 
 export default class PaymentVouchersController {
     /**
-     *Générer un bon de paiement PDF
+     * Génération du bon de paiement PDF
      */
     async generateVoucher({ auth, request, response }: HttpContext) {
         try {
-            const user = auth.user!
+            const user = auth.user
+            if (!user) {
+                return response.unauthorized({ message: 'Utilisateur non authentifié.' })
+            }
             const { category, duration, bank } = request.only(['category', 'duration', 'bank'])
-
-            //Recherche du tarif dans la table SubscriptionType
             const type = await SubscriptionType.query()
                 .where('category', category)
                 .where('duration_months', duration)
@@ -31,22 +32,19 @@ export default class PaymentVouchersController {
 
             if (!type) {
                 return response.badRequest({
-                    message: `Aucun tarif trouvé pour la catégorie "${category}" et la durée "${duration}" mois.`,
+                    message: `Aucun tarif trouvé pour la catégorie "${category}" (${duration} mois).`,
                 })
             }
 
-            //Création du dossier temporaire pour stocker les fichiers
+            const referenceCode = `BON-${Date.now()}`
+
             const tmpDir = path.resolve('tmp/vouchers')
             if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
 
-            //Génération du QR code et du PDF
-            const referenceCode = `BON-${Date.now()}`
-            const qrPath = path.resolve(tmpDir, `qrcode_${referenceCode}.png`)
-            const pdfPath = path.resolve(tmpDir, `voucher_${referenceCode}.pdf`)
+            const qrPath = path.join(tmpDir, `qrcode_${referenceCode}.png`)
+            const pdfPath = path.join(tmpDir, `voucher_${referenceCode}.pdf`)
 
             await QRCode.toFile(qrPath, referenceCode, { width: 250 })
-
-            //Création du bon de paiement en base
             const voucher = await PaymentVoucher.create({
                 referenceCode,
                 amount: type.price,
@@ -56,8 +54,6 @@ export default class PaymentVouchersController {
                 subscriberId: user.id,
                 qrCode: qrPath,
             })
-
-            //Génération du PDF du bon de paiement
             await generateVoucherPDF({
                 outputPath: pdfPath,
                 data: {
@@ -71,23 +67,26 @@ export default class PaymentVouchersController {
                     createdAt: voucher.createdAt.toFormat('dd/MM/yyyy'),
                 },
             })
-
-            //Téléchargement du fichier
             response.header(
                 'Content-Disposition',
                 `attachment; filename="${voucher.referenceCode}.pdf"`,
             )
+            response.type('application/pdf')
             await response.download(pdfPath)
+            setTimeout(() => {
+                if (fs.existsSync(tmpDir)) {
+                    fs.rmSync(tmpDir, { recursive: true, force: true })
+                    console.log(`[INFO] Dossier temporaire supprimé : ${tmpDir}`)
+                }
+            }, 3000)
         } catch (error) {
+            console.error('[ERREUR GENERATION BON]:', error)
             return handleError(response, error, 'Erreur lors de la génération du bon de paiement.')
-        } finally {
-            //Nettoyage des fichiers temporaires
-            fs.rmSync('tmp/vouchers', { recursive: true, force: true })
         }
     }
 
     /**
-     *Validation du paiement → Création abonnement + carte
+     * Validation du paiement → création d’un abonnement + carte PDF
      */
     async validatePayment({ params, request, response }: HttpContext) {
         try {
@@ -113,7 +112,7 @@ export default class PaymentVouchersController {
             voucher.merge({ status: VoucherStatus.PAYE, validatedAt: DateTime.now() })
             await voucher.save()
 
-            //Créer l’abonnement
+            //Création de l’abonnement
             const startDate = DateTime.now()
             const endDate = startDate.plus({ months: voucher.duration })
 
@@ -125,13 +124,12 @@ export default class PaymentVouchersController {
                 subscriberId: voucher.subscriberId,
             })
 
-            //Génération de la carte d’abonnement (QR vers Next.js)
+            //Génération de la carte PDF
             const uniqueCode = `CARD-${randomUUID()}`
             const cardDir = path.resolve('tmp/cards')
             if (!fs.existsSync(cardDir)) fs.mkdirSync(cardDir, { recursive: true })
 
             const verifyUrl = `https://ebibliotheque-upn.cd/verify/${uniqueCode}`
-
             const qrPath = path.resolve(cardDir, `qrcode_card_${uniqueCode}.png`)
             const pdfPath = path.resolve(cardDir, `sub_card_${uniqueCode}.pdf`)
             await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
@@ -166,12 +164,48 @@ export default class PaymentVouchersController {
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la validation du paiement.')
         } finally {
-            fs.rmSync('tmp/cards', { recursive: true, force: true })
+            const tmp = path.resolve('tmp/cards')
+            if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true, force: true })
         }
     }
 
     /**
-     *Génération du reçu PDF
+     *Liste paginée des bons de paiement
+     */
+    async index({ auth, request, response }: HttpContext) {
+        try {
+            const user = auth.user
+            if (!user) return response.unauthorized({ message: 'Utilisateur non authentifié.' })
+
+            const status = request.input('status')
+            const search = request.input('search', '').trim()
+            const page = Number(request.input('page', 1))
+            const limit = Number(request.input('limit', 10))
+
+            const query = PaymentVoucher.query()
+                .where('subscriber_id', user.id)
+                .preload('transactions')
+                .orderBy('created_at', 'desc')
+
+            if (status) query.andWhere('status', status)
+            if (search) {
+                query.andWhere((q) => {
+                    q.whereILike('reference_code', `%${search}%`).orWhereILike(
+                        'amount',
+                        `%${search}%`,
+                    )
+                })
+            }
+
+            const vouchers = await query.paginate(page, limit)
+            return response.ok({ status: 'success', data: vouchers })
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors du chargement des bons.')
+        }
+    }
+
+    /**
+     *Génération du reçu de paiement (PDF)
      */
     async generateReceipt({ params, response }: HttpContext) {
         try {
@@ -208,97 +242,18 @@ export default class PaymentVouchersController {
                 'Content-Disposition',
                 `attachment; filename="recu_${voucher.referenceCode}.pdf"`,
             )
-            await response.download(pdfPath)
+            response.type('application/pdf')
+            return response.download(pdfPath)
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la génération du reçu.')
         } finally {
-            fs.rmSync('tmp/receipts', { recursive: true, force: true })
+            const tmp = path.resolve('tmp/receipts')
+            if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true, force: true })
         }
     }
 
     /**
-     * Liste paginée des bons de paiement
-     */
-    async index({ auth, request, response }: HttpContext) {
-        try {
-            const user = auth.user!
-            const status = request.input('status')
-            const search = request.input('search', '').trim()
-            const page = Number(request.input('page', 1))
-            const limit = Number(request.input('limit', 10))
-
-            const query = PaymentVoucher.query()
-                .where('subscriber_id', user.id)
-                .preload('transactions')
-                .orderBy('created_at', 'desc')
-
-            if (status) query.andWhere('status', status)
-            if (search) {
-                query.andWhere((q) => {
-                    q.whereILike('reference_code', `%${search}%`).orWhereILike(
-                        'amount',
-                        `%${search}%`,
-                    )
-                })
-            }
-
-            const vouchers = await query.paginate(page, limit)
-            return response.ok(vouchers)
-        } catch (error) {
-            return handleError(response, error, 'Erreur lors du chargement des bons.')
-        }
-    }
-
-    /**
-     * Détails d’un bon
-     */
-    async show({ params, response }: HttpContext) {
-        try {
-            const voucher = await PaymentVoucher.query()
-                .where('id', params.id)
-                .preload('subscriber')
-                .preload('transactions')
-                .firstOrFail()
-
-            return response.ok(voucher)
-        } catch (error) {
-            return handleError(response, error, 'Erreur lors de la récupération du bon.')
-        }
-    }
-
-    /**
-     * Suppression d’un bon non payé
-     */
-    async delete({ params, response }: HttpContext) {
-        try {
-            const voucher = await PaymentVoucher.findOrFail(params.id)
-            if (voucher.status === VoucherStatus.PAYE) {
-                return response.badRequest({ message: 'Impossible de supprimer un bon déjà payé.' })
-            }
-            await voucher.delete()
-            return response.ok({ message: 'Bon supprimé avec succès.' })
-        } catch (error) {
-            return handleError(response, error, 'Erreur lors de la suppression du bon.')
-        }
-    }
-
-    /**
-     *  Réinitialisation du statut d’un bon
-     */
-    async resetStatus({ params, response }: HttpContext) {
-        try {
-            const voucher = await PaymentVoucher.findOrFail(params.id)
-            voucher.merge({ status: VoucherStatus.EN_ATTENTE })
-            await voucher.save()
-            return response.ok({ message: 'Statut du bon réinitialisé.', voucher })
-        } catch (error) {
-            return handleError(response, error, 'Erreur lors de la réinitialisation du statut.')
-        }
-    }
-
-    /**
-     *Liste les formules selon la catégorie
-     *
+     * Liste des formules selon la catégorie
      */
     async listByCategory({ params, response }: HttpContext) {
         try {
@@ -306,27 +261,27 @@ export default class PaymentVouchersController {
             if (!Object.values(SubscriberCategory).includes(category)) {
                 return response.badRequest({ message: 'Catégorie invalide.' })
             }
-            const subscriptionTypes =
+
+            const data =
                 category === SubscriberCategory.STUDENT
                     ? [
                           { id: 1, category, duration: 3, price: 5, devise: 'USD' },
                           { id: 2, category, duration: 6, price: 10, devise: 'USD' },
-                          { id: 3, category, duration: 9, price: 15, devise: 'USD' },
+                          { id: 3, category, duration: 12, price: 15, devise: 'USD' },
                       ]
                     : [
                           { id: 4, category, duration: 3, price: 10, devise: 'USD' },
                           { id: 5, category, duration: 6, price: 15, devise: 'USD' },
-                          { id: 6, category, duration: 9, price: 20, devise: 'USD' },
+                          { id: 6, category, duration: 12, price: 20, devise: 'USD' },
                       ]
 
             return response.ok({
                 status: 'success',
                 message: 'Formules d’abonnement récupérées avec succès.',
-                data: subscriptionTypes,
+                data,
             })
         } catch (error) {
-            return
-            handleError(response, error, 'Erreur lors du chargement des formules.')
+            return handleError(response, error, 'Erreur lors du chargement des formules.')
         }
     }
 }

@@ -1,39 +1,49 @@
 /*
 |--------------------------------------------------------------------------
-| HTTP kernel
+| HTTP kernel file
 |--------------------------------------------------------------------------
+|
+| The HTTP kernel file is used to register the middleware with the server
+| or the router.
+|
 */
 
 import router from '@adonisjs/core/services/router'
 import server from '@adonisjs/core/services/server'
 
 /**
- * Gestionnaire global des erreurs
+ * The error handler is used to convert an exception
+ * to an HTTP response.
  */
 server.errorHandler(() => import('#exceptions/handler'))
 
 /**
- * ✅ Middleware appliqués à TOUTES les requêtes,
- * même sans route correspondante (pré-vol, favicon, etc.)
+ * The server middleware stack runs middleware on all the HTTP
+ * requests, even if there is no route registered for
+ * the request URL.
  */
 server.use([
     () => import('#middleware/container_bindings_middleware'),
     () => import('#middleware/force_json_response_middleware'),
-    () => import('@adonisjs/cors/cors_middleware'), // CORS global
+    () => import('@adonisjs/cors/cors_middleware'),
 ])
 
 /**
- * ✅ Middleware appliqués à toutes les routes déclarées
+ * The router middleware stack runs middleware on all the HTTP
+ * requests with a registered route.
  */
 router.use([
-    () => import('@adonisjs/core/bodyparser_middleware'), // 💥 indispensable pour lire le JSON
+    () => import('@adonisjs/core/bodyparser_middleware'),
     () => import('@adonisjs/auth/initialize_auth_middleware'),
-    // () => import('#middleware/initialize_bouncer_middleware'),
+    //() => import('#middleware/initialize_bouncer_middleware'),
 ])
 
 /**
- * ✅ Middleware nommés (utilisables dans .middleware([...]) sur une route spécifique)
+ * Named middleware collection must be explicitly assigned to
+ * the routes or the routes group.
  */
-/*export const namedMiddleware = router.named({
-    heartbeat: () => import('#middleware/heartbeat_middleware'),
-})*/
+export const namedMiddleware = router.named({
+    auth: () => import('#middleware/auth_middleware'),
+    // hasRole: () => import('#middleware/has_role_middleware'),
+    // checkBlocked: () => import('#middleware/check_blocked_middleware'),
+})

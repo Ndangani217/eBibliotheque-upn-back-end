@@ -81,10 +81,10 @@ export default class PaymentVoucher extends BaseModel {
     /** Vérifie automatiquement l’expiration du bon */
     @beforeSave()
     static async checkExpiration(voucher: PaymentVoucher) {
-        const expirationDate = voucher.createdAt.plus({ months: voucher.duration })
-        const now = DateTime.now()
+        const baseDate = voucher.createdAt || DateTime.now()
+        const expirationDate = baseDate.plus({ months: voucher.duration })
 
-        if (now > expirationDate && voucher.status !== VoucherStatus.EXPIRE) {
+        if (DateTime.now() > expirationDate && voucher.status !== VoucherStatus.EXPIRE) {
             voucher.status = VoucherStatus.EXPIRE
             console.log(`Bon ${voucher.referenceCode} marqué comme expiré.`)
         }
