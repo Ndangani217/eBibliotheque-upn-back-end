@@ -11,7 +11,7 @@ import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf
 
 export default class SubscriptionCardsController {
     /**
-     *Génération manuelle d’une carte d’abonnement (PDF + QR)
+     * 🪪 Génération manuelle d’une carte d’abonnement (PDF + QR)
      */
     async generateCard({ params, response, auth }: HttpContext) {
         try {
@@ -23,14 +23,16 @@ export default class SubscriptionCardsController {
             const subscription = await Subscription.query()
                 .where('payment_voucher_id', params.id)
                 .preload('subscriber')
-                .preload('paymentVoucher')
+                .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
                 .firstOrFail()
 
             const { subscriber, paymentVoucher } = subscription
+            const type = paymentVoucher.subscriptionType
+
             const uniqueCode = `CARD-${randomUUID()}`
             const verifyUrl = `https://ebibliotheque-upn.cd/verify/${uniqueCode}`
 
-            //Dossier temporaire unique
+            // 📂 Création d’un dossier temporaire unique
             const tmpDir = path.resolve(`tmp/cards/${uniqueCode}`)
             fs.mkdirSync(tmpDir, { recursive: true })
 
@@ -38,13 +40,13 @@ export default class SubscriptionCardsController {
             const pdfPath = path.join(tmpDir, `card_${uniqueCode}.pdf`)
             await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
 
-            //Génération du PDF
+            // 🧾 Génération du PDF de la carte
             await generateSubscriptionCardPDF({
                 outputPath: pdfPath,
                 data: {
                     fullName: `${subscriber.firstName} ${subscriber.lastName}`,
                     reference: paymentVoucher.referenceCode,
-                    category: paymentVoucher.category,
+                    category: type.category, // ✅ récupérée depuis subscriptionType
                     startDate: subscription.startDate.toFormat('dd/MM/yyyy'),
                     endDate: subscription.endDate.toFormat('dd/MM/yyyy'),
                     qrPath,
@@ -52,7 +54,7 @@ export default class SubscriptionCardsController {
                 },
             })
 
-            //Enregistrement
+            // 💾 Enregistrement de la carte
             await SubscriptionCard.create({
                 subscriptionId: subscription.id,
                 uniqueCode,
@@ -62,11 +64,11 @@ export default class SubscriptionCardsController {
                 pdfPath,
             })
 
-            //Téléchargement du PDF
+            // 📤 Téléchargement du PDF généré
             response.header('Content-Disposition', `attachment; filename="carte_${uniqueCode}.pdf"`)
             await response.download(pdfPath)
 
-            //Nettoyage silencieux du dossier
+            // ♻️ Nettoyage du dossier temporaire
             setTimeout(() => {
                 fs.rmSync(tmpDir, { recursive: true, force: true })
             }, 3000)
@@ -76,14 +78,16 @@ export default class SubscriptionCardsController {
     }
 
     /**
-     *Vérification publique d’une carte via QR
+     * ✅ Vérification publique d’une carte via QR Code
      */
     async verify({ params, response }: HttpContext) {
         try {
             const card = await SubscriptionCard.query()
                 .where('unique_code', params.code)
                 .preload('subscription', (sub) =>
-                    sub.preload('subscriber').preload('paymentVoucher'),
+                    sub
+                        .preload('subscriber')
+                        .preload('paymentVoucher', (pv) => pv.preload('subscriptionType')),
                 )
                 .firstOrFail()
 
@@ -97,7 +101,7 @@ export default class SubscriptionCardsController {
                 card: {
                     uniqueCode: card.uniqueCode,
                     subscriber: `${subscription.subscriber.firstName} ${subscription.subscriber.lastName}`,
-                    category: subscription.paymentVoucher.category,
+                    category: subscription.paymentVoucher.subscriptionType.category, // ✅ corrigé
                     reference: subscription.paymentVoucher.referenceCode,
                     startDate: subscription.startDate.toFormat('dd/MM/yyyy'),
                     endDate: subscription.endDate.toFormat('dd/MM/yyyy'),
@@ -112,11 +116,8 @@ export default class SubscriptionCardsController {
     }
 
     /**
-     * Récupération de la carte active de l’utilisateur connecté
+     * Récupère la carte d’abonnement active de l’utilisateur connecté
      * Endpoint : GET /payments/cards/active
-     */
-    /**
-     * Récupère la carte d’abonnement active du user connecté
      */
     async getActiveCard({ auth, response }: HttpContext) {
         try {
@@ -125,14 +126,16 @@ export default class SubscriptionCardsController {
                 return response.unauthorized({ message: 'Utilisateur non authentifié.' })
             }
 
-            //Recherche de la carte active liée à cet utilisateur
+            // 🔍 Recherche de la carte active
             const card = await SubscriptionCard.query()
                 .whereHas('subscription', (sub) => {
                     sub.where('subscriber_id', user.id)
                 })
                 .where('is_active', true)
                 .preload('subscription', (sub) =>
-                    sub.preload('paymentVoucher').preload('subscriber'),
+                    sub
+                        .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
+                        .preload('subscriber'),
                 )
                 .orderBy('issued_at', 'desc')
                 .first()
@@ -141,6 +144,8 @@ export default class SubscriptionCardsController {
                 return response.notFound({ message: 'Aucune carte active trouvée.' })
             }
 
+            const subscription = card.subscription
+
             return response.ok({
                 id: card.id,
                 unique_code: card.uniqueCode,
@@ -148,8 +153,9 @@ export default class SubscriptionCardsController {
                 issued_at: card.issuedAt,
                 pdf_path: card.pdfPath,
                 subscription: {
-                    start_date: card.subscription.startDate.toISODate(),
-                    end_date: card.subscription.endDate.toISODate(),
+                    category: subscription.paymentVoucher.subscriptionType.category,
+                    start_date: subscription.startDate.toISODate(),
+                    end_date: subscription.endDate.toISODate(),
                 },
             })
         } catch (error) {

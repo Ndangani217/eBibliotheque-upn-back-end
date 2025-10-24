@@ -14,7 +14,7 @@ import Transaction from '#models/transaction'
 import Subscription from '#models/subscription'
 import SubscriptionType from '#models/subscription_type'
 import User from '#models/user'
-import { VoucherStatus, SubscriberCategory, SubscriptionDuration } from '#enums/library_enums'
+import { VoucherStatus } from '#enums/library_enums'
 
 export default class PaymentVoucher extends BaseModel {
     @column({ isPrimary: true })
@@ -27,12 +27,6 @@ export default class PaymentVoucher extends BaseModel {
     declare amount: number
 
     @column()
-    declare category: SubscriberCategory
-
-    @column()
-    declare duration: SubscriptionDuration
-
-    @column()
     declare status: VoucherStatus
 
     @column()
@@ -43,6 +37,9 @@ export default class PaymentVoucher extends BaseModel {
 
     @column()
     declare subscriberId: string
+
+    @column()
+    declare subscriptionTypeId: number
 
     @column.dateTime()
     declare validatedAt: DateTime | null
@@ -65,7 +62,7 @@ export default class PaymentVoucher extends BaseModel {
     @column.dateTime({ autoCreate: true, autoUpdate: true })
     declare updatedAt: DateTime
 
-    /** Supprime le QR code associé lors de la suppression du bon */
+    /** Supprime le QR code lors de la suppression */
     @beforeDelete()
     static async deleteQrFile(voucher: PaymentVoucher) {
         if (voucher.qrCode && fs.existsSync(voucher.qrCode)) {
@@ -81,12 +78,14 @@ export default class PaymentVoucher extends BaseModel {
     /** Vérifie automatiquement l’expiration du bon */
     @beforeSave()
     static async checkExpiration(voucher: PaymentVoucher) {
-        const baseDate = voucher.createdAt || DateTime.now()
-        const expirationDate = baseDate.plus({ months: voucher.duration })
-
-        if (DateTime.now() > expirationDate && voucher.status !== VoucherStatus.EXPIRE) {
-            voucher.status = VoucherStatus.EXPIRE
-            console.log(`Bon ${voucher.referenceCode} marqué comme expiré.`)
+        const type = await voucher.related('subscriptionType').query().first()
+        if (type) {
+            const baseDate = voucher.createdAt || DateTime.now()
+            const expirationDate = baseDate.plus({ months: type.durationMonths })
+            if (DateTime.now() > expirationDate && voucher.status !== VoucherStatus.EXPIRE) {
+                voucher.status = VoucherStatus.EXPIRE
+                console.log(`Bon ${voucher.referenceCode} marqué comme expiré.`)
+            }
         }
     }
 }

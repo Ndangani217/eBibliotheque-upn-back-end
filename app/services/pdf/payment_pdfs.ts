@@ -7,16 +7,13 @@ interface PDFData {
     data: Record<string, any>
 }
 
-/* === Bon d’autorisation de paiement — UPN amélioré === */
 export async function generateVoucherPDF({ outputPath, data }: PDFData) {
-    const doc = new PDFDocument({ margin: 50 })
+    const doc = new PDFDocument({ margin: 50, size: 'A4' })
     await writePDFAsync(doc, outputPath, () => {
-        // === En-tête complet ===
         header(doc, 'BON D’AUTORISATION DE PAIEMENT — eBibliothèque')
 
-        // === Corps du document (marges ajustées) ===
-        const bodyY = 200 // descend légèrement pour éviter le chevauchement du bandeau
-        doc.roundedRect(45, bodyY, 520, 260, 10).lineWidth(1.3).stroke('#1e3a8a')
+        const bodyY = 190
+        doc.roundedRect(45, bodyY, 520, 240, 10).lineWidth(1.3).stroke('#1e3a8a')
         doc.fontSize(12).fillColor('#111')
 
         const leftX = 70
@@ -24,16 +21,23 @@ export async function generateVoucherPDF({ outputPath, data }: PDFData) {
         const baseY = bodyY + 25
         const spacing = 25
 
-        // === Données utilisateur ===
+        // ✅ Traduction catégorie FR
+        const categoryLabel =
+            data.category === 'researcher'
+                ? 'Chercheur'
+                : data.category === 'student'
+                  ? 'Étudiant'
+                  : data.category || '—'
+
         const infos = [
             ['Nom complet :', data.fullName],
-            ['Catégorie :', data.category],
+            ['Catégorie :', categoryLabel],
             ['Durée :', `${data.duration} mois`],
             ['Banque :', data.bank || '—'],
             ['Montant à payer :', `${data.amount} USD`],
             ['Référence :', data.reference],
             [
-                'Date et heure d’émission :',
+                'Date d’émission :',
                 `${data.createdAt} à ${new Date().toLocaleTimeString('fr-FR', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -46,25 +50,22 @@ export async function generateVoucherPDF({ outputPath, data }: PDFData) {
             doc.font('Helvetica').text(value, valueX, baseY + spacing * i)
         })
 
-        // === QR Code aligné à droite ===
         if (data.qrCodePath && fs.existsSync(data.qrCodePath)) {
-            const qrY = bodyY + 10
-            doc.roundedRect(395, qrY, 140, 150, 6).stroke('#d1d5db')
-            doc.image(data.qrCodePath, 405, qrY + 10, { width: 120 })
+            const qrY = bodyY + 15
+            doc.roundedRect(400, qrY, 135, 135, 6).stroke('#d1d5db')
+            doc.image(data.qrCodePath, 410, qrY + 10, { width: 115 })
             doc.fontSize(9)
                 .fillColor('#555')
-                .text('Code QR de vérification', 405, qrY + 135, { align: 'center', width: 120 })
+                .text('Code QR de vérification', 410, qrY + 125, { align: 'center', width: 115 })
         }
 
-        // === Ligne décorative + bande d’instructions ===
-        const footerY = bodyY + 250
+        const footerY = bodyY + 245
         doc.moveTo(45, footerY).lineTo(565, footerY).strokeColor('#1e3a8a').stroke()
         doc.roundedRect(45, footerY + 10, 520, 60, 6).fill('#1e3a8a')
         doc.fillColor('#fff')
-            .font('Helvetica')
             .fontSize(11)
             .text(
-                'Présentez ce bon à la banque pour le paiement. Conservez soigneusement la référence et le code QR pour vérification par le gestionnaire de la bibliothèque numérique.',
+                'Présentez ce bon à la banque pour le paiement. Conservez la référence et le code QR pour vérification par le gestionnaire de la bibliothèque numérique.',
                 60,
                 footerY + 25,
                 { align: 'justify', width: 490 },
@@ -74,14 +75,13 @@ export async function generateVoucherPDF({ outputPath, data }: PDFData) {
     })
 }
 
-/* === Reçu de paiement (style harmonisé vert) === */
 export async function generateReceiptPDF({ outputPath, data }: PDFData) {
-    const doc = new PDFDocument({ margin: 50 })
+    const doc = new PDFDocument({ margin: 50, size: 'A4' })
     await writePDFAsync(doc, outputPath, () => {
         header(doc, 'REÇU DE PAIEMENT — eBibliothèque')
 
-        const bodyY = 200
-        doc.roundedRect(45, bodyY, 520, 260, 10).lineWidth(1.3).stroke('#16a34a')
+        const bodyY = 190
+        doc.roundedRect(45, bodyY, 520, 250, 10).lineWidth(1.3).stroke('#16a34a')
         doc.fontSize(12).fillColor('#111')
 
         const leftX = 70
@@ -89,9 +89,17 @@ export async function generateReceiptPDF({ outputPath, data }: PDFData) {
         const baseY = bodyY + 25
         const spacing = 25
 
+        // ✅ Traduction catégorie FR
+        const categoryLabel =
+            data.category === 'researcher'
+                ? 'Chercheur'
+                : data.category === 'student'
+                  ? 'Étudiant'
+                  : data.category || '—'
+
         const infos = [
             ['Nom complet :', data.fullName],
-            ['Catégorie :', data.category],
+            ['Catégorie :', categoryLabel],
             ['Durée :', `${data.duration} mois`],
             ['Montant payé :', `${data.amount} USD`],
             ['Banque :', data.bank || '—'],
@@ -106,22 +114,21 @@ export async function generateReceiptPDF({ outputPath, data }: PDFData) {
         })
 
         if (data.qrCodePath && fs.existsSync(data.qrCodePath)) {
-            const qrY = bodyY + 10
-            doc.roundedRect(395, qrY, 140, 150, 6).stroke('#d1d5db')
-            doc.image(data.qrCodePath, 405, qrY + 10, { width: 120 })
+            const qrY = bodyY + 15
+            doc.roundedRect(400, qrY, 135, 135, 6).stroke('#d1d5db')
+            doc.image(data.qrCodePath, 410, qrY + 10, { width: 115 })
             doc.fontSize(9)
                 .fillColor('#555')
-                .text('Code QR de vérification', 405, qrY + 135, { align: 'center', width: 120 })
+                .text('Code QR de vérification', 410, qrY + 125, { align: 'center', width: 115 })
         }
 
-        const footerY = bodyY + 300
+        const footerY = bodyY + 260
         doc.moveTo(45, footerY).lineTo(565, footerY).strokeColor('#16a34a').stroke()
         doc.roundedRect(45, footerY + 10, 520, 60, 6).fill('#16a34a')
         doc.fillColor('#fff')
-            .font('Helvetica')
             .fontSize(11)
             .text(
-                'Paiement confirmé et validé par le système eBibliothèque. Veuillez conserver ce reçu comme preuve officielle de transaction.',
+                'Paiement confirmé et validé par le système eBibliothèque. Conservez ce reçu comme preuve officielle de transaction.',
                 60,
                 footerY + 25,
                 { align: 'justify', width: 490 },
@@ -131,7 +138,6 @@ export async function generateReceiptPDF({ outputPath, data }: PDFData) {
     })
 }
 
-/* === Écriture du PDF === */
 function writePDFAsync(doc: PDFKit.PDFDocument, outputPath: string, contentFn: () => void) {
     return new Promise<void>((resolve, reject) => {
         const stream = fs.createWriteStream(outputPath)
@@ -142,25 +148,15 @@ function writePDFAsync(doc: PDFKit.PDFDocument, outputPath: string, contentFn: (
             reject(err)
         }
         doc.end()
-        stream.on('finish', () => {
-            console.log(`PDF généré avec succès : ${outputPath}`)
-            resolve()
-        })
+        stream.on('finish', () => resolve())
         stream.on('error', reject)
     })
 }
 
-/* === En-tête officiel UPN (espacement ajusté et logo centré) === */
 function header(doc: PDFKit.PDFDocument, title: string) {
     const logoPath = path.resolve('public/logo-upn.png')
-    const hasLogo = fs.existsSync(logoPath)
+    if (fs.existsSync(logoPath)) doc.image(logoPath, 270, 45, { width: 70 })
 
-    // === Logo centré ===
-    if (hasLogo) {
-        doc.image(logoPath, 270, 45, { width: 70 })
-    }
-
-    // === Texte institutionnel équilibré ===
     const baseY = 130
     doc.font('Helvetica-Bold')
         .fontSize(10)
@@ -180,25 +176,16 @@ function header(doc: PDFKit.PDFDocument, title: string) {
         .fillColor('#555')
         .text('Direction du Service Numérique — eBibliothèque', { align: 'center' })
 
-    // === Bandeau bleu (descendu légèrement pour ne pas coller au texte) ===
     const bandY = 170
     doc.roundedRect(45, bandY, 520, 25, 5).fill('#1e3a8a')
     doc.fillColor('#fff')
         .font('Helvetica-Bold')
         .fontSize(13)
         .text(title, 0, bandY + 6, { align: 'center' })
-
-    // Ligne de séparation sous le bandeau
-    doc.moveTo(45, bandY + 25)
-        .lineTo(565, bandY + 25)
-        .strokeColor('#1e3a8a')
-        .stroke()
 }
 
-/* === Pied de page harmonisé === */
 function footer(doc: PDFKit.PDFDocument) {
-    const footerY = 650
-
+    const footerY = 720
     doc.fontSize(9)
         .fillColor('#555')
         .text(
@@ -207,7 +194,6 @@ function footer(doc: PDFKit.PDFDocument) {
             footerY,
             { align: 'center', width: 500 },
         )
-
     doc.fontSize(9)
         .fillColor('#1e3a8a')
         .text('« La digitalisation en marche — eBibliothèque UPN »', 0, footerY + 20, {
