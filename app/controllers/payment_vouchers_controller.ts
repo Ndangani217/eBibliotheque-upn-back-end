@@ -7,6 +7,7 @@ import SubscriptionType from '#models/subscription_type'
 import { VoucherStatus, SubscriptionStatus, SubscriberCategory } from '#enums/library_enums'
 import { generateVoucherPDF, generateReceiptPDF } from '#services/pdf/payment_pdfs'
 import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf'
+import { generateVoucherValidator } from '#validators/payment_voucher'
 import path from 'node:path'
 import QRCode from 'qrcode'
 import fs from 'node:fs'
@@ -15,6 +16,11 @@ import { handleError } from '#helpers/handle_error'
 import { randomUUID } from 'node:crypto'
 
 export default class PaymentVouchersController {
+    /**
+     * Générer un bon de paiement
+     * - Ne crée pas de doublon si un bon EN_ATTENTE existe encore pour la même durée
+     * - Génère un PDF à la volée sans le sauvegarder définitivement
+     */
     async generateVoucher({ auth, request, response }: HttpContext) {
         try {
             const user = auth.user
@@ -22,10 +28,10 @@ export default class PaymentVouchersController {
                 return response.unauthorized({ message: 'Utilisateur non authentifié.' })
             }
 
-            const { duration, bank } = request.only(['duration', 'bank'])
-
+            const { duration, bank } = await request.validateUsing(generateVoucherValidator)
             const category = (user.category ?? SubscriberCategory.STUDENT) as SubscriberCategory
 
+            //Trouve la formule correspondante (3, 6, 12 mois)
             const type = await SubscriptionType.query()
                 .where('is_active', true)
                 .where('category', category)
@@ -38,22 +44,40 @@ export default class PaymentVouchersController {
                 })
             }
 
-            const referenceCode = `BON-${Date.now()}`
-            const tmpDir = path.resolve('tmp/vouchers')
-            if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
+            // Vérifie s’il existe déjà un bon en attente ou actif
+            const existingVoucher = await PaymentVoucher.query()
+                .where('subscriber_id', user.id)
+                .where('subscription_type_id', type.id)
+                .whereIn('status', [VoucherStatus.EN_ATTENTE])
+                .orderBy('created_at', 'desc')
+                .first()
 
+            // Prépare le dossier temporaire
+            const tmpDir = path.resolve('tmp/vouchers')
+            fs.mkdirSync(tmpDir, { recursive: true })
+
+            let voucher = existingVoucher
+            let referenceCode = existingVoucher?.referenceCode || `BON-${Date.now()}`
+            let createdAt = existingVoucher?.createdAt || DateTime.now()
+            let amount = type.price
+
+            // Si aucun bon valide, en créer un nouveau
+            if (!existingVoucher) {
+                voucher = await PaymentVoucher.create({
+                    referenceCode,
+                    bankReceiptNumber: bank,
+                    amount,
+                    status: VoucherStatus.EN_ATTENTE,
+                    subscriberId: user.id,
+                    subscriptionTypeId: type.id,
+                })
+            }
+
+            // Génération du QR + PDF (à la volée)
             const qrPath = path.join(tmpDir, `qrcode_${referenceCode}.png`)
             const pdfPath = path.join(tmpDir, `voucher_${referenceCode}.pdf`)
-            await QRCode.toFile(qrPath, referenceCode, { width: 250 })
 
-            const voucher = await PaymentVoucher.create({
-                referenceCode,
-                amount: type.price,
-                status: VoucherStatus.EN_ATTENTE,
-                subscriberId: user.id,
-                subscriptionTypeId: type.id,
-                qrCode: qrPath,
-            })
+            await QRCode.toFile(qrPath, referenceCode, { width: 250 })
 
             await generateVoucherPDF({
                 outputPath: pdfPath,
@@ -62,20 +86,19 @@ export default class PaymentVouchersController {
                     category,
                     duration: type.durationMonths,
                     bank,
-                    amount: type.price,
-                    reference: voucher.referenceCode,
+                    amount,
+                    reference: referenceCode,
                     qrCodePath: qrPath,
-                    createdAt: voucher.createdAt.toFormat('dd/MM/yyyy'),
+                    createdAt: createdAt.toFormat('dd/MM/yyyy'),
                 },
             })
 
-            response.header(
-                'Content-Disposition',
-                `attachment; filename="${voucher.referenceCode}.pdf"`,
-            )
+            // Envoi direct du fichier PDF
+            response.header('Content-Disposition', `attachment; filename="${referenceCode}.pdf"`)
             response.type('application/pdf')
             await response.download(pdfPath)
 
+            //Nettoyage automatique après 3 secondes
             setTimeout(() => {
                 fs.rmSync(tmpDir, { recursive: true, force: true })
             }, 3000)
@@ -85,8 +108,14 @@ export default class PaymentVouchersController {
         }
     }
 
+    /**
+     *  Validation du paiement
+     * - Met à jour le bon
+     * - Crée l’abonnement et la carte
+     */
     async validatePayment({ params, request, response }: HttpContext) {
         try {
+            // 1️⃣ Récupération du bon de paiement
             const voucher = await PaymentVoucher.query()
                 .where('id', params.id)
                 .preload('subscriber')
@@ -94,9 +123,13 @@ export default class PaymentVouchersController {
                 .firstOrFail()
 
             const { bankReference, bankStatus } = request.only(['bankReference', 'bankStatus'])
-            if (voucher.status === VoucherStatus.PAYE)
-                return response.badRequest({ message: 'Ce bon est déjà validé.' })
 
+            // 2️⃣ Vérification du statut du bon
+            if (voucher.status === VoucherStatus.PAYE) {
+                return response.badRequest({ message: 'Ce bon est déjà validé.' })
+            }
+
+            // 3️⃣ Enregistrement de la transaction bancaire
             await Transaction.create({
                 bankReference,
                 bankStatus,
@@ -104,9 +137,11 @@ export default class PaymentVouchersController {
                 paymentVoucherId: voucher.id,
             })
 
+            // 4️⃣ Mise à jour du statut du bon
             voucher.merge({ status: VoucherStatus.PAYE, validatedAt: DateTime.now() })
             await voucher.save()
 
+            // 5️⃣ Création de l’abonnement associé
             const startDate = DateTime.now()
             const endDate = startDate.plus({ months: voucher.subscriptionType.durationMonths })
 
@@ -118,15 +153,22 @@ export default class PaymentVouchersController {
                 subscriberId: voucher.subscriberId,
             })
 
+            // 6️⃣ Génération du QR code (fichier + base64)
             const uniqueCode = `CARD-${randomUUID()}`
-            const cardDir = path.resolve('tmp/cards')
-            if (!fs.existsSync(cardDir)) fs.mkdirSync(cardDir, { recursive: true })
-
             const verifyUrl = `https://ebibliotheque-upn.cd/verify/${uniqueCode}`
-            const qrPath = path.resolve(cardDir, `qrcode_card_${uniqueCode}.png`)
-            const pdfPath = path.resolve(cardDir, `sub_card_${uniqueCode}.pdf`)
+            const cardDir = path.resolve('tmp/cards')
+            fs.mkdirSync(cardDir, { recursive: true })
+
+            const qrPath = path.join(cardDir, `qrcode_card_${uniqueCode}.png`)
+            const pdfPath = path.join(cardDir, `sub_card_${uniqueCode}.pdf`)
+
+            // 📂  Génère le fichier image PNG
             await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
 
+            // 🧬  Génère la version Base64 pour affichage direct dans React
+            const qrBase64 = await QRCode.toDataURL(verifyUrl)
+
+            // 7️⃣ Génération du PDF de la carte
             await generateSubscriptionCardPDF({
                 outputPath: pdfPath,
                 data: {
@@ -140,105 +182,37 @@ export default class PaymentVouchersController {
                 },
             })
 
+            // 8️⃣ Enregistrement de la carte (non active)
             await SubscriptionCard.create({
                 subscriptionId: subscription.id,
                 uniqueCode,
                 issuedAt: DateTime.now(),
-                isActive: true,
-                qrCodePath: qrPath,
-                pdfPath,
+                isActive: false, // Carte désactivée par défaut
+                qrCodePath: qrPath, // chemin local
+                pdfPath: pdfPath,
+                qrCodeBase64: qrBase64, // ✅ champ optionnel pour affichage immédiat
             })
 
+            // 9️⃣ Nettoyage du dossier temporaire (optionnel)
+            setTimeout(() => {
+                fs.rmSync(cardDir, { recursive: true, force: true })
+            }, 3000)
+
+            // 🔟 Réponse
             return response.ok({
-                message: 'Paiement validé, abonnement activé et carte générée.',
+                message: 'Paiement validé. Carte créée (inactive) avec QR visible immédiatement.',
                 voucher,
                 subscription,
+                qr_preview: qrBase64, // 🔥 ajout : aperçu direct du QR pour ton frontend
             })
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la validation du paiement.')
-        } finally {
-            const tmp = path.resolve('tmp/cards')
-            if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true, force: true })
         }
     }
 
-    async index({ auth, request, response }: HttpContext) {
-        try {
-            const user = auth.user
-            if (!user) return response.unauthorized({ message: 'Utilisateur non authentifié.' })
-
-            const status = request.input('status')
-            const search = request.input('search', '').trim()
-            const page = Number(request.input('page', 1))
-            const limit = Number(request.input('limit', 10))
-
-            const query = PaymentVoucher.query()
-                .where('subscriber_id', user.id)
-                .preload('subscriptionType')
-                .preload('transactions')
-                .orderBy('created_at', 'desc')
-
-            if (status) query.andWhere('status', status)
-            if (search)
-                query.andWhere((q) => {
-                    q.whereILike('reference_code', `%${search}%`).orWhereILike(
-                        'amount',
-                        `%${search}%`,
-                    )
-                })
-
-            const vouchers = await query.paginate(page, limit)
-            return response.ok({ status: 'success', data: vouchers })
-        } catch (error) {
-            return handleError(response, error, 'Erreur lors du chargement des bons.')
-        }
-    }
-
-    async generateReceipt({ params, response }: HttpContext) {
-        try {
-            const voucher = await PaymentVoucher.query()
-                .where('id', params.id)
-                .preload('subscriber')
-                .preload('subscriptionType')
-                .preload('transactions')
-                .firstOrFail()
-
-            if (voucher.status !== VoucherStatus.PAYE)
-                return response.badRequest({ message: 'Le paiement n’est pas encore validé.' })
-
-            const transaction = voucher.transactions[0]
-            const tmpDir = path.resolve('tmp/receipts')
-            if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
-
-            const pdfPath = path.resolve(tmpDir, `receipt_${voucher.referenceCode}.pdf`)
-            await generateReceiptPDF({
-                outputPath: pdfPath,
-                data: {
-                    fullName: `${voucher.subscriber.firstName} ${voucher.subscriber.lastName}`,
-                    category: voucher.subscriptionType.category,
-                    duration: voucher.subscriptionType.durationMonths,
-                    amount: voucher.amount,
-                    reference: voucher.referenceCode,
-                    transactionId: transaction?.id || '—',
-                    paymentDate: voucher.validatedAt?.toFormat('dd/MM/yyyy') || '—',
-                    bank: transaction?.bankReference || '—',
-                },
-            })
-
-            response.header(
-                'Content-Disposition',
-                `attachment; filename="recu_${voucher.referenceCode}.pdf"`,
-            )
-            response.type('application/pdf')
-            return response.download(pdfPath)
-        } catch (error) {
-            return handleError(response, error, 'Erreur lors de la génération du reçu.')
-        } finally {
-            const tmp = path.resolve('tmp/receipts')
-            if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true, force: true })
-        }
-    }
-
+    /**
+     *  Liste des formules actives (publique)
+     */
     async listActiveFormulas({ response }: HttpContext) {
         try {
             const data = await SubscriptionType.query()
@@ -248,6 +222,67 @@ export default class PaymentVouchersController {
             return response.ok({ status: 'success', data })
         } catch (error) {
             return handleError(response, error, 'Erreur lors du chargement des formules.')
+        }
+    }
+
+    async listValidSubscriptions({ request, response }: HttpContext) {
+        try {
+            const page = Number(request.input('page', 1))
+            const limit = Number(request.input('limit', 10))
+            const search = (request.input('search', '') as string).trim().toLowerCase()
+
+            const now = DateTime.now()
+
+            const query = Subscription.query()
+                .where('status', SubscriptionStatus.VALIDE)
+                .where('end_date', '>', now.toSQL()) // encore actif
+                .preload('subscriber')
+                .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
+                .orderBy('start_date', 'desc')
+
+            if (search) {
+                query.whereHas('subscriber', (q) => {
+                    q.whereILike('first_name', `%${search}%`)
+                        .orWhereILike('last_name', `%${search}%`)
+                        .orWhereILike('email', `%${search}%`)
+                        .orWhereILike('phone_number', `%${search}%`)
+                })
+            }
+
+            const subscriptions = await query.paginate(page, limit)
+
+            const data = subscriptions.map((sub) => ({
+                subscriber: {
+                    id: sub.subscriber.id,
+                    firstName: sub.subscriber.firstName,
+                    lastName: sub.subscriber.lastName,
+                    email: sub.subscriber.email,
+                    phoneNumber: sub.subscriber.phoneNumber,
+                    category: sub.subscriber.category,
+                },
+                subscription: {
+                    id: sub.id,
+                    startDate: sub.startDate.toFormat('dd/MM/yyyy'),
+                    endDate: sub.endDate.toFormat('dd/MM/yyyy'),
+                    status: sub.status,
+                    createdAt: sub.createdAt.toFormat('dd/MM/yyyy HH:mm'),
+                },
+                voucher: {
+                    reference: sub.paymentVoucher.referenceCode,
+                    amount: sub.paymentVoucher.amount,
+                    duration: sub.paymentVoucher.subscriptionType.durationMonths,
+                    status: sub.paymentVoucher.status,
+                },
+            }))
+
+            return response.ok({
+                status: 'success',
+                message: 'Liste des abonnés valides',
+                data,
+                meta: subscriptions.getMeta(),
+            })
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors du chargement des abonnés valides.')
         }
     }
 }

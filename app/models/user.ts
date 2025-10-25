@@ -7,7 +7,6 @@ import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
 import { UserRole, SubscriberCategory } from '#enums/library_enums'
-import Notification from '#models/notification'
 import Subscription from '#models/subscription'
 import PaymentVoucher from '#models/payment_voucher'
 
@@ -20,7 +19,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column({ isPrimary: true })
     declare id: string
 
-    /** Informations personnelles */
     @column()
     declare name: string
 
@@ -55,21 +53,14 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column({ columnName: 'is_blocked', serializeAs: 'isBlocked' })
     declare isBlocked: boolean
 
-    /**  Rôle du compte (admin, manager, citizen, etc.) */
     @column()
     declare role: UserRole
 
-    /**  Catégorie d’abonné (étudiant, chercheur, etc.) */
     @column()
     declare category: SubscriberCategory | null
 
-    /** Matricule pour étudiants */
     @column()
     declare matricule: string | null
-
-    /**  Relations */
-    @hasMany(() => Notification)
-    declare notifications: HasMany<typeof Notification>
 
     @hasMany(() => Subscription)
     declare subscriptions: HasMany<typeof Subscription>
@@ -77,7 +68,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @hasMany(() => PaymentVoucher)
     declare paymentVouchers: HasMany<typeof PaymentVoucher>
 
-    /** Dates automatiques */
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime
 

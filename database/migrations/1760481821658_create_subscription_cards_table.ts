@@ -9,6 +9,7 @@ export default class extends BaseSchema {
 
             table.string('unique_code').notNullable().unique()
             table.string('qr_code_path').notNullable()
+            table.text('qr_code_base64').nullable()
             table.string('pdf_path').notNullable()
             table.timestamp('issued_at', { useTz: true }).notNullable()
             table.boolean('is_active').defaultTo(true)

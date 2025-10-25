@@ -55,19 +55,20 @@ router
     .group(() => {
         // Bons de paiement
         router.post('/vouchers/generate', [PaymentVouchersController, 'generateVoucher'])
-        router.get('/vouchers', [PaymentVouchersController, 'index'])
+        //router.get('/vouchers', [PaymentVouchersController, 'index'])
         router.post('/vouchers/:id/validate', [PaymentVouchersController, 'validatePayment'])
-        router.get('/vouchers/:id/receipt', [PaymentVouchersController, 'generateReceipt'])
+        //router.get('/vouchers/:id/receipt', [PaymentVouchersController, 'generateReceipt'])
 
-        // Carte d’abonnement (actuelle ou téléchargement)
+        //Carte d’abonnement
         router.get('/cards/active', [SubscriptionCardsController, 'getActiveCard'])
-        //router.get('/cards/download/:id', [SubscriptionCardsController, 'download'])
+        router.get('/cards/generate/:id', [SubscriptionCardsController, 'generateCard'])
+        router.patch('/cards/:id/activate', [SubscriptionCardsController, 'activateCard'])
     })
     .prefix('/payments')
     .use(middleware.auth())
 
-// Route publique pour les formules
-router.get('/payments/subscription-types/:category', [PaymentVouchersController, 'listByCategory'])
-
 // Route publique pour la vérification QR
 router.get('/payments/cards/verify/:code', [SubscriptionCardsController, 'verify'])
+
+// Route publique pour les formules
+//router.get('/payments/subscription-types/:category', [PaymentVouchersController, 'listByCategory'])

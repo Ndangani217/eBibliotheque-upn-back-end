@@ -79,7 +79,6 @@ export default class UserController {
                 .where('id', params.id)
                 .preload('subscriptions')
                 .preload('paymentVouchers')
-                .preload('notifications')
                 .first()
 
             if (!user) {
