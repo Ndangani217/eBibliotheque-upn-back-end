@@ -22,7 +22,7 @@ export default class SubscriptionCardsController {
                 return response.unauthorized({ message: 'Utilisateur non authentifié.' })
             }
 
-            // 🔍 Recherche l’abonnement lié au bon
+            // Recherche l’abonnement lié au bon
             const subscription = await Subscription.query()
                 .where('payment_voucher_id', params.id)
                 .preload('subscriber')
@@ -206,11 +206,11 @@ export default class SubscriptionCardsController {
             }
 
             //(Optionnel) Vérifie que seul un admin/manager peut activer
-            /*if (user.role !== 'admin' && user.role !== 'manager') {
+            if (user.role !== 'admin' && user.role !== 'manager') {
                 return response.forbidden({
                     message: 'Seul un administrateur ou manager peut activer une carte.',
                 })
-            }*/
+            }
 
             //Vérifie que l’abonnement est encore valide
             const now = DateTime.now()

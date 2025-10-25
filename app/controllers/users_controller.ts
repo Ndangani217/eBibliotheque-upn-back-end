@@ -22,25 +22,32 @@ export default class UserController {
             const search = (request.input('search', '') as string).trim().toLowerCase()
 
             const users = await User.query()
-                .where('is_verified', true)
+                .whereIn('role', ['manager', 'manager_viewer'])
+                .andWhere('is_verified', true)
                 .if(search !== '', (query) => {
                     query
-                        .whereILike('name', `%${search}%`)
+                        .whereILike('first_name', `%${search}%`)
                         .orWhereILike('last_name', `%${search}%`)
-                        .orWhereILike('first_name', `%${search}%`)
                         .orWhereILike('email', `%${search}%`)
                         .orWhereILike('phone_number', `%${search}%`)
                 })
                 .orderBy('created_at', 'desc')
                 .paginate(page, limit)
 
+            const sanitized = users.serialize({
+                fields: {
+                    omit: ['password', 'verifyToken', 'verifyExpires'],
+                },
+            })
+
             return response.ok({
                 status: 'success',
-                message: 'List of verified users',
-                data: users,
+                message: 'Liste des managers et managers (vue)',
+                data: sanitized,
             })
         } catch (error) {
-            return handleError(response, error, 'Unable to retrieve verified users list')
+            console.error('Erreur index UsersController:', error)
+            return handleError(response, error, 'Impossible de récupérer la liste des managers')
         }
     }
 

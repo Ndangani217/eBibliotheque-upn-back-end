@@ -115,7 +115,7 @@ export default class PaymentVouchersController {
      */
     async validatePayment({ params, request, response }: HttpContext) {
         try {
-            // 1️⃣ Récupération du bon de paiement
+            //Récupération du bon de paiement
             const voucher = await PaymentVoucher.query()
                 .where('id', params.id)
                 .preload('subscriber')
@@ -124,12 +124,12 @@ export default class PaymentVouchersController {
 
             const { bankReference, bankStatus } = request.only(['bankReference', 'bankStatus'])
 
-            // 2️⃣ Vérification du statut du bon
+            //Vérification du statut du bon
             if (voucher.status === VoucherStatus.PAYE) {
                 return response.badRequest({ message: 'Ce bon est déjà validé.' })
             }
 
-            // 3️⃣ Enregistrement de la transaction bancaire
+            // Enregistrement de la transaction bancaire
             await Transaction.create({
                 bankReference,
                 bankStatus,
@@ -137,11 +137,11 @@ export default class PaymentVouchersController {
                 paymentVoucherId: voucher.id,
             })
 
-            // 4️⃣ Mise à jour du statut du bon
+            //Mise à jour du statut du bon
             voucher.merge({ status: VoucherStatus.PAYE, validatedAt: DateTime.now() })
             await voucher.save()
 
-            // 5️⃣ Création de l’abonnement associé
+            //Création de l’abonnement associé
             const startDate = DateTime.now()
             const endDate = startDate.plus({ months: voucher.subscriptionType.durationMonths })
 
@@ -153,7 +153,7 @@ export default class PaymentVouchersController {
                 subscriberId: voucher.subscriberId,
             })
 
-            // 6️⃣ Génération du QR code (fichier + base64)
+            //Génération du QR code (fichier + base64)
             const uniqueCode = `CARD-${randomUUID()}`
             const verifyUrl = `https://ebibliotheque-upn.cd/verify/${uniqueCode}`
             const cardDir = path.resolve('tmp/cards')
@@ -162,13 +162,13 @@ export default class PaymentVouchersController {
             const qrPath = path.join(cardDir, `qrcode_card_${uniqueCode}.png`)
             const pdfPath = path.join(cardDir, `sub_card_${uniqueCode}.pdf`)
 
-            // 📂  Génère le fichier image PNG
+            //Génère le fichier image PNG
             await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
 
-            // 🧬  Génère la version Base64 pour affichage direct dans React
+            //Génère la version Base64 pour affichage direct dans React
             const qrBase64 = await QRCode.toDataURL(verifyUrl)
 
-            // 7️⃣ Génération du PDF de la carte
+            //Génération du PDF de la carte
             await generateSubscriptionCardPDF({
                 outputPath: pdfPath,
                 data: {
@@ -182,28 +182,28 @@ export default class PaymentVouchersController {
                 },
             })
 
-            // 8️⃣ Enregistrement de la carte (non active)
+            //Enregistrement de la carte (non active)
             await SubscriptionCard.create({
                 subscriptionId: subscription.id,
                 uniqueCode,
                 issuedAt: DateTime.now(),
-                isActive: false, // Carte désactivée par défaut
-                qrCodePath: qrPath, // chemin local
+                isActive: false,
+                qrCodePath: qrPath,
                 pdfPath: pdfPath,
-                qrCodeBase64: qrBase64, // ✅ champ optionnel pour affichage immédiat
+                qrCodeBase64: qrBase64,
             })
 
-            // 9️⃣ Nettoyage du dossier temporaire (optionnel)
+            //Nettoyage du dossier temporaire (optionnel)
             setTimeout(() => {
                 fs.rmSync(cardDir, { recursive: true, force: true })
             }, 3000)
 
-            // 🔟 Réponse
+            //Réponse
             return response.ok({
                 message: 'Paiement validé. Carte créée (inactive) avec QR visible immédiatement.',
                 voucher,
                 subscription,
-                qr_preview: qrBase64, // 🔥 ajout : aperçu direct du QR pour ton frontend
+                qr_preview: qrBase64,
             })
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la validation du paiement.')
