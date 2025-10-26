@@ -14,6 +14,7 @@ const AuthController = () => import('#controllers/auth_controller')
 const UserController = () => import('#controllers/users_controller')
 const PaymentVouchersController = () => import('#controllers/payment_vouchers_controller')
 const SubscriptionCardsController = () => import('#controllers/subscription_cards_controller')
+const ManagerController = () => import('#controllers/managers_controller')
 
 /* ------------------------------
  * AUTHENTIFICATION
@@ -72,3 +73,16 @@ router.get('/payments/cards/verify/:code', [SubscriptionCardsController, 'verify
 
 // Route publique pour les formules
 //router.get('/payments/subscription-types/:category', [PaymentVouchersController, 'listByCategory'])
+router
+    .group(() => {
+        router.get('/dashboard', [ManagerController, 'dashboard'])
+        router.get('/payments', [ManagerController, 'payments'])
+        router.patch('/payments/:id/validate', [ManagerController, 'validatePayment'])
+        router.get('/subscriptions', [ManagerController, 'subscriptions'])
+        router.get('/cards', [ManagerController, 'cards'])
+        router.patch('/cards/:id/activate', [ManagerController, 'activateCard'])
+        router.get('/cards/:id/print', [ManagerController, 'printCard'])
+        router.get('/subscriptions/expiring-soon', [ManagerController, 'expiringSoon'])
+    })
+    .prefix('/manager')
+    .use(middleware.auth())

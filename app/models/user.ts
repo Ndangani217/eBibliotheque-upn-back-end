@@ -4,8 +4,8 @@ import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import { UserRole, SubscriberCategory } from '#enums/library_enums'
 import Subscription from '#models/subscription'
 import PaymentVoucher from '#models/payment_voucher'
@@ -64,6 +64,12 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
     @hasMany(() => Subscription)
     declare subscriptions: HasMany<typeof Subscription>
+
+    @column({ columnName: 'subscriber_id' })
+    declare subscriberId: string
+
+    @belongsTo(() => User, { foreignKey: 'subscriberId' })
+    declare subscriber: BelongsTo<typeof User>
 
     @hasMany(() => PaymentVoucher)
     declare paymentVouchers: HasMany<typeof PaymentVoucher>
