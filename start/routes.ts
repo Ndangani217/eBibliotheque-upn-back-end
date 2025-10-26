@@ -79,6 +79,7 @@ router
         router.get('/payments', [ManagerController, 'payments'])
         router.patch('/payments/:id/validate', [ManagerController, 'validatePayment'])
         router.get('/subscriptions', [ManagerController, 'subscriptions'])
+        router.patch('/subscriptions/:id/suspend', [ManagerController, 'suspend'])
         router.get('/cards', [ManagerController, 'cards'])
         router.patch('/cards/:id/activate', [ManagerController, 'activateCard'])
         router.get('/cards/:id/print', [ManagerController, 'printCard'])

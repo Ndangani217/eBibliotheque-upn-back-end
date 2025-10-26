@@ -140,33 +140,61 @@ export default class ManagerController {
     }
 
     /**
-     *Liste des abonnements actifs / expirés
+     *Liste des abonnements actifs / expirés, suspendu
      */
     async subscriptions({ request, response }: HttpContext) {
         try {
             const status = request.input('status')
-            const subscriptions = await Subscription.query()
-                .if(status, (query) => query.where('status', status))
+            const search = request.input('search', '').trim()
+            const page = Number(request.input('page', 1))
+            const limit = Number(request.input('limit', 10))
+
+            //Construction de la requête
+            const query = Subscription.query()
                 .preload('subscriber')
                 .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
                 .orderBy('created_at', 'desc')
+                .if(status, (q) => q.where('status', status))
+                .if(search, (q) => {
+                    q.whereHas('subscriber', (subQuery) =>
+                        subQuery
+                            .whereILike('first_name', `%${search}%`)
+                            .orWhereILike('last_name', `%${search}%`),
+                    ).orWhereHas('paymentVoucher', (pvQuery) =>
+                        pvQuery.whereHas('subscriptionType', (stQuery) =>
+                            stQuery.whereILike('category', `%${search}%`),
+                        ),
+                    )
+                })
 
-            const formatted = subscriptions.map((s) => ({
+            //Pagination
+            const paginated = await query.paginate(page, limit)
+            const data = paginated.toJSON().data
+
+            //Formatage
+            const formatted = data.map((s) => ({
                 id: s.id,
-                subscriberName: `${s.subscriber?.firstName ?? ''} ${s.subscriber?.lastName ?? ''}`,
-                category: s.paymentVoucher?.subscriptionType?.category,
+                subscriberName:
+                    `${s.subscriber?.firstName ?? ''} ${s.subscriber?.lastName ?? ''}`.trim(),
+                category: s.paymentVoucher?.subscriptionType?.category ?? '—',
                 startDate: s.startDate,
                 endDate: s.endDate,
                 status: s.status,
             }))
 
+            //Réponse standardisée
             return response.ok({
                 status: 'success',
                 message: 'Liste des abonnements',
                 data: formatted,
+                meta: paginated.getMeta(),
             })
         } catch (error) {
-            return handleError(response, error, 'Erreur lors du chargement des abonnements')
+            console.error(error)
+            return response.status(500).json({
+                status: 'error',
+                message: 'Erreur lors du chargement des abonnements',
+            })
         }
     }
 
@@ -257,6 +285,7 @@ export default class ManagerController {
         }
     }
 
+    //Abonnements expirant dans les 7 prochains jours
     async expiringSoon({ response }: HttpContext) {
         try {
             const nextWeek = DateTime.now().plus({ days: 7 })
@@ -282,6 +311,46 @@ export default class ManagerController {
                 error,
                 'Erreur lors du chargement des abonnements expirant bientôt.',
             )
+        }
+    }
+
+    /**
+     * Suspendre un abonnement actif
+     */
+    async suspend({ params, response }: HttpContext) {
+        try {
+            const id = params.id
+
+            const subscription = await Subscription.find(id)
+            if (!subscription) {
+                return response.notFound({
+                    status: 'error',
+                    message: 'Abonnement introuvable',
+                })
+            }
+
+            if (subscription.status !== SubscriptionStatus.VALIDE) {
+                return response.badRequest({
+                    status: 'error',
+                    message: 'Seuls les abonnements actifs peuvent être suspendus',
+                })
+            }
+            subscription.status = SubscriptionStatus.SUSPENDU
+            await subscription.save()
+            return response.ok({
+                status: 'success',
+                message: 'Abonnement suspendu avec succès',
+                data: {
+                    id: subscription.id,
+                    newStatus: subscription.status,
+                },
+            })
+        } catch (error) {
+            console.error(error)
+            return response.status(500).json({
+                status: 'error',
+                message: "Erreur lors de la suspension de l'abonnement",
+            })
         }
     }
 }
