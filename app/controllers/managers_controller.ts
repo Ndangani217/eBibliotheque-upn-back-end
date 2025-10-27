@@ -5,7 +5,11 @@ import Subscription from '#models/subscription'
 import PaymentVoucher from '#models/payment_voucher'
 import SubscriptionCard from '#models/subscription_card'
 import { handleError } from '#helpers/handle_error'
-import { UserRole, VoucherStatus, SubscriptionStatus } from '#enums/library_enums'
+import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf'
+import path from 'node:path'
+import fs from 'node:fs'
+import QRCode from 'qrcode'
+import { UserRole, VoucherStatus, SubscriptionStatus, CardStatus } from '#enums/library_enums'
 
 export default class ManagerController {
     /**
@@ -105,41 +109,6 @@ export default class ManagerController {
     }
 
     /**
-     *Validation d’un paiement
-     */
-    async validatePayment({ params, response }: HttpContext) {
-        try {
-            const payment = await PaymentVoucher.query()
-                .where('id', params.id)
-                .preload('subscription')
-                .firstOrFail()
-
-            payment.status = VoucherStatus.PAYE
-            payment.validatedAt = DateTime.now()
-            await payment.save()
-
-            // Si une carte existe pour l’abonnement lié
-            if (payment.subscription) {
-                const card = await SubscriptionCard.query()
-                    .where('subscription_id', payment.subscription.id)
-                    .first()
-
-                if (card) {
-                    card.isActive = true
-                    await card.save()
-                }
-            }
-
-            return response.ok({
-                status: 'success',
-                message: 'Paiement validé et carte activée avec succès',
-            })
-        } catch (error) {
-            return handleError(response, error, 'Impossible de valider le paiement')
-        }
-    }
-
-    /**
      *Liste des abonnements actifs / expirés, suspendu
      */
     async subscriptions({ request, response }: HttpContext) {
@@ -201,9 +170,15 @@ export default class ManagerController {
     /**
      *Liste des cartes d’abonnement
      */
-    async cards({ response }: HttpContext) {
+    async cards({ request, response }: HttpContext) {
         try {
-            const cards = await SubscriptionCard.query()
+            //Récupération des filtres
+            const status = request.input('status') // 'active' | 'inactive'
+            const search = request.input('search', '').trim()
+            const page = Number(request.input('page', 1))
+            const limit = Number(request.input('limit', 10))
+
+            const query = SubscriptionCard.query()
                 .preload('subscription', (sub) =>
                     sub
                         .preload('subscriber')
@@ -211,13 +186,34 @@ export default class ManagerController {
                 )
                 .orderBy('created_at', 'desc')
 
-            const formatted = cards.map((c) => ({
+            if (status === 'active') query.where('is_active', true)
+            if (status === 'inactive') query.where('is_active', false)
+
+            if (search) {
+                query.whereHas('subscription', (subQuery) => {
+                    subQuery.whereHas('subscriber', (subscriberQuery) => {
+                        subscriberQuery
+                            .whereILike('first_name', `%${search}%`)
+                            .orWhereILike('last_name', `%${search}%`)
+                            .orWhereILike('email', `%${search}%`)
+                    })
+                })
+            }
+
+            const paginated = await query.paginate(page, limit)
+            const data = paginated.toJSON().data
+
+            const formatted = data.map((c) => ({
                 id: c.id,
                 uniqueCode: c.uniqueCode,
-                subscriberName: `${c.subscription?.subscriber?.firstName ?? ''} ${c.subscription?.subscriber?.lastName ?? ''}`,
-                category: c.subscription?.paymentVoucher?.subscriptionType?.category,
+                subscriberName: `${c.subscription?.subscriber?.firstName ?? ''} ${
+                    c.subscription?.subscriber?.lastName ?? ''
+                }`.trim(),
+                subscriberEmail: c.subscription?.subscriber?.email ?? '—',
+                category: c.subscription?.paymentVoucher?.subscriptionType?.category ?? '—',
                 issuedAt: c.issuedAt,
-                status: c.isActive ? 'active' : 'inactive',
+                expiresAt: c.expiresAt,
+                status: c.isActive ? CardStatus.ACTIVE : CardStatus.INACTIVE,
                 pdfPath: c.pdfPath,
             }))
 
@@ -225,6 +221,7 @@ export default class ManagerController {
                 status: 'success',
                 message: 'Liste des cartes d’abonnement',
                 data: formatted,
+                meta: paginated.getMeta(),
             })
         } catch (error) {
             return handleError(response, error, 'Erreur lors du chargement des cartes')
@@ -267,21 +264,55 @@ export default class ManagerController {
             const subscriber = subscription.subscriber
             const type = subscription.paymentVoucher.subscriptionType
 
-            const pdfContent = `
-            Carte d'abonnement - Bibliothèque UPN
-            ----------------------------------------
-            Nom : ${subscriber.firstName} ${subscriber.lastName}
-            Catégorie : ${type.category}
-            Date d'émission : ${card.issuedAt.toFormat('dd/MM/yyyy')}
-            Valide jusqu'au : ${subscription.endDate.toFormat('dd/MM/yyyy')}
-            Code unique : ${card.uniqueCode}
-            `
+            // Vérifie si la carte est valide
+            if (!card.isActive) {
+                return response.badRequest({ message: 'Cette carte est inactive.' })
+            }
 
-            response.header('Content-Type', 'application/pdf')
-            response.header('Content-Disposition', `attachment; filename=carte-${card.id}.pdf`)
-            return response.send(pdfContent)
+            const now = DateTime.now()
+            if (card.expiresAt < now) {
+                return response.badRequest({ message: 'Cette carte est expirée.' })
+            }
+
+            // === Dossiers temporaires ===
+            const tmpDir = path.resolve('tmp/cards')
+            fs.mkdirSync(tmpDir, { recursive: true })
+
+            const qrPath = path.join(tmpDir, `qr_${card.uniqueCode}.png`)
+            const pdfPath = path.join(tmpDir, `card_${card.uniqueCode}.pdf`)
+            const verifyUrl = `https://ebibliotheque-upn.cd/verify/${card.uniqueCode}`
+
+            await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
+
+            await generateSubscriptionCardPDF({
+                outputPath: pdfPath,
+                data: {
+                    fullName: `${subscriber.firstName} ${subscriber.lastName}`,
+                    email: subscriber.email,
+                    phoneNumber: subscriber.phoneNumber,
+                    category: type.category,
+                    startDate: card.issuedAt.toFormat('dd/MM/yyyy'),
+                    endDate: card.expiresAt.toFormat('dd/MM/yyyy'),
+                    reference: card.uniqueCode,
+                    qrCodePath: qrPath,
+                },
+            })
+
+            // Téléchargement direct
+            response.header(
+                'Content-Disposition',
+                `attachment; filename="carte-${card.uniqueCode}.pdf"`,
+            )
+            response.type('application/pdf')
+            await response.download(pdfPath)
+
+            // Nettoyage automatique après 3 sec
+            setTimeout(() => {
+                fs.rmSync(tmpDir, { recursive: true, force: true })
+            }, 3000)
         } catch (error) {
-            return handleError(response, error, 'Erreur lors de la génération du PDF')
+            console.error('Erreur impression carte:', error)
+            return handleError(response, error, 'Erreur lors de la génération du PDF de la carte.')
         }
     }
 
@@ -317,7 +348,7 @@ export default class ManagerController {
     /**
      * Suspendre un abonnement actif
      */
-    async suspend({ params, response }: HttpContext) {
+    async suspendCard({ params, response }: HttpContext) {
         try {
             const id = params.id
 

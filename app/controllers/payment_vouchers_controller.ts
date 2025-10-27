@@ -5,7 +5,7 @@ import Subscription from '#models/subscription'
 import SubscriptionCard from '#models/subscription_card'
 import SubscriptionType from '#models/subscription_type'
 import { VoucherStatus, SubscriptionStatus, SubscriberCategory } from '#enums/library_enums'
-import { generateVoucherPDF, generateReceiptPDF } from '#services/pdf/payment_pdfs'
+import { generateVoucherPDF } from '#services/pdf/payment_pdfs'
 import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf'
 import { generateVoucherValidator } from '#validators/payment_voucher'
 import path from 'node:path'
@@ -111,10 +111,13 @@ export default class PaymentVouchersController {
     /**
      *  Validation du paiement
      * - Met à jour le bon
-     * - Crée l’abonnement et la carte
+     * - Crée l’abonnement actif
+     * - Génère la carte immédiatement active
      */
-    async validatePayment({ params, request, response }: HttpContext) {
+    async validatePayment({ params, response }: HttpContext) {
         try {
+            console.log('--- DÉBUT VALIDATION DU PAIEMENT ---')
+
             //Récupération du bon de paiement
             const voucher = await PaymentVoucher.query()
                 .where('id', params.id)
@@ -122,26 +125,47 @@ export default class PaymentVouchersController {
                 .preload('subscriptionType')
                 .firstOrFail()
 
-            const { bankReference, bankStatus } = request.only(['bankReference', 'bankStatus'])
+            const bankReference = 'Rawbank'
+            const bankStatus = VoucherStatus.PAYE
 
-            //Vérification du statut du bon
+            //Vérifie si déjà validé
             if (voucher.status === VoucherStatus.PAYE) {
                 return response.badRequest({ message: 'Ce bon est déjà validé.' })
             }
 
-            // Enregistrement de la transaction bancaire
+            //Vérifie si l’abonné a déjà un abonnement valide ou non expiré
+            const activeSubscription = await Subscription.query()
+                .where('subscriber_id', voucher.subscriberId)
+                .where((q) => {
+                    q.where('status', SubscriptionStatus.VALIDE).andWhere(
+                        'end_date',
+                        '>',
+                        DateTime.now().toSQL(),
+                    )
+                })
+                .first()
+
+            if (activeSubscription) {
+                return response.badRequest({
+                    message:
+                        'Cet abonné possède déjà un abonnement actif ou non expiré. Veuillez attendre son expiration avant d’en créer un nouveau.',
+                })
+            }
+
+            // Enregistre la transaction bancaire
             await Transaction.create({
                 bankReference,
                 bankStatus,
                 transactionDate: DateTime.now(),
                 paymentVoucherId: voucher.id,
             })
+            console.log(`Transaction enregistrée (${bankReference})`)
 
-            //Mise à jour du statut du bon
+            //Met à jour le statut du bon
             voucher.merge({ status: VoucherStatus.PAYE, validatedAt: DateTime.now() })
             await voucher.save()
 
-            //Création de l’abonnement associé
+            // Création de l’abonnement immédiatement actif
             const startDate = DateTime.now()
             const endDate = startDate.plus({ months: voucher.subscriptionType.durationMonths })
 
@@ -153,7 +177,7 @@ export default class PaymentVouchersController {
                 subscriberId: voucher.subscriberId,
             })
 
-            //Génération du QR code (fichier + base64)
+            //Génération du QR code et du PDF
             const uniqueCode = `CARD-${randomUUID()}`
             const verifyUrl = `https://ebibliotheque-upn.cd/verify/${uniqueCode}`
             const cardDir = path.resolve('tmp/cards')
@@ -162,50 +186,44 @@ export default class PaymentVouchersController {
             const qrPath = path.join(cardDir, `qrcode_card_${uniqueCode}.png`)
             const pdfPath = path.join(cardDir, `sub_card_${uniqueCode}.pdf`)
 
-            //Génère le fichier image PNG
+            console.log('Génération du QR code...')
             await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
-
-            //Génère la version Base64 pour affichage direct dans React
             const qrBase64 = await QRCode.toDataURL(verifyUrl)
+            console.log('QR code généré :', qrPath)
 
-            //Génération du PDF de la carte
-            await generateSubscriptionCardPDF({
-                outputPath: pdfPath,
-                data: {
-                    fullName: `${voucher.subscriber.firstName} ${voucher.subscriber.lastName}`,
-                    category: voucher.subscriptionType.category,
-                    reference: voucher.referenceCode,
-                    startDate: startDate.toFormat('dd/MM/yyyy'),
-                    endDate: endDate.toFormat('dd/MM/yyyy'),
-                    uniqueCode,
-                    qrPath,
-                },
-            })
-
-            //Enregistrement de la carte (non active)
-            await SubscriptionCard.create({
+            //Création de la carte d’abonnement
+            const issuedAt = DateTime.now()
+            const card = await SubscriptionCard.create({
                 subscriptionId: subscription.id,
                 uniqueCode,
-                issuedAt: DateTime.now(),
-                isActive: false,
+                issuedAt,
+                expiresAt: endDate,
+                isActive: true,
                 qrCodePath: qrPath,
                 pdfPath: pdfPath,
                 qrCodeBase64: qrBase64,
             })
 
-            //Nettoyage du dossier temporaire (optionnel)
+            //Nettoyage différé des fichiers temporaires
             setTimeout(() => {
-                fs.rmSync(cardDir, { recursive: true, force: true })
-            }, 3000)
+                try {
+                    fs.rmSync(cardDir, { recursive: true, force: true })
+                    console.log('Dossier temporaire supprimé :', cardDir)
+                } catch (err) {
+                    console.error('Erreur lors du nettoyage :', err)
+                }
+            }, 10000)
 
-            //Réponse
+            // Réponse finale
             return response.ok({
-                message: 'Paiement validé. Carte créée (inactive) avec QR visible immédiatement.',
+                message: 'Paiement validé — Abonnement et carte activés automatiquement.',
                 voucher,
                 subscription,
+                card,
                 qr_preview: qrBase64,
             })
         } catch (error) {
+            console.error('Erreur validatePayment:', error)
             return handleError(response, error, 'Erreur lors de la validation du paiement.')
         }
     }

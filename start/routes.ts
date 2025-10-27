@@ -57,7 +57,7 @@ router
         // Bons de paiement
         router.post('/vouchers/generate', [PaymentVouchersController, 'generateVoucher'])
         //router.get('/vouchers', [PaymentVouchersController, 'index'])
-        router.post('/vouchers/:id/validate', [PaymentVouchersController, 'validatePayment'])
+        //router.post('/vouchers/:id/validate', [PaymentVouchersController, 'validatePayment'])
         //router.get('/vouchers/:id/receipt', [PaymentVouchersController, 'generateReceipt'])
 
         //Carte d’abonnement
@@ -77,13 +77,18 @@ router
     .group(() => {
         router.get('/dashboard', [ManagerController, 'dashboard'])
         router.get('/payments', [ManagerController, 'payments'])
-        router.patch('/payments/:id/validate', [ManagerController, 'validatePayment'])
+        router.patch('/payments/:id/validate', [PaymentVouchersController, 'validatePayment'])
         router.get('/subscriptions', [ManagerController, 'subscriptions'])
-        router.patch('/subscriptions/:id/suspend', [ManagerController, 'suspend'])
+        router.patch('/subscriptions/:id/suspend', [ManagerController, 'suspendCard'])
         router.get('/cards', [ManagerController, 'cards'])
         router.patch('/cards/:id/activate', [ManagerController, 'activateCard'])
+        router.patch('/cards/:id/suspend', [ManagerController, 'suspendCard'])
         router.get('/cards/:id/print', [ManagerController, 'printCard'])
         router.get('/subscriptions/expiring-soon', [ManagerController, 'expiringSoon'])
     })
     .prefix('/manager')
     .use(middleware.auth())
+
+router.patch('/maintenance/cards/expire', [SubscriptionCardsController, 'checkExpiredCards'])
+
+196 - 169 - 606

@@ -42,3 +42,8 @@ export enum SubscriptionDuration {
     SIX_MONTHS = 6,
     NINE_MONTHS = 9,
 }
+
+export enum CardStatus {
+    ACTIVE = 'active',
+    INACTIVE = 'inactive',
+}

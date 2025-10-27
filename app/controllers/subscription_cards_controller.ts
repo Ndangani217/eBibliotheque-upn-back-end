@@ -11,7 +11,7 @@ import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf
 
 export default class SubscriptionCardsController {
     /**
-     * 🪪 Génère à la volée la carte d’un abonnement existant
+     * Génère à la volée la carte d’un abonnement existant
      * - Aucun fichier n’est stocké définitivement
      * - Regénère la même carte si elle est encore active
      */
@@ -22,14 +22,14 @@ export default class SubscriptionCardsController {
                 return response.unauthorized({ message: 'Utilisateur non authentifié.' })
             }
 
-            // Recherche l’abonnement lié au bon
+            //Recherche l’abonnement lié au bon de paiement
             const subscription = await Subscription.query()
                 .where('payment_voucher_id', params.id)
                 .preload('subscriber')
                 .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
                 .firstOrFail()
 
-            // Vérifie la validité
+            //Vérifie la validité de l’abonnement
             const now = DateTime.now()
             const isExpired = now > subscription.endDate
             if (isExpired) {
@@ -41,16 +41,17 @@ export default class SubscriptionCardsController {
             const { subscriber, paymentVoucher } = subscription
             const type = paymentVoucher.subscriptionType
 
-            // Vérifie s’il existe déjà une carte active
+            //Vérifie s’il existe déjà une carte active
             const existingCard = await SubscriptionCard.query()
                 .where('subscription_id', subscription.id)
                 .where('is_active', true)
                 .first()
 
+            // Génère ou réutilise un code unique
             const uniqueCode = existingCard?.uniqueCode || `CARD-${randomUUID()}`
             const verifyUrl = `https://ebibliotheque-upn.cd/verify/${uniqueCode}`
 
-            // 📂 Création d’un dossier temporaire
+            //Création du dossier temporaire
             const tmpDir = path.resolve(`tmp/cards/${uniqueCode}`)
             fs.mkdirSync(tmpDir, { recursive: true })
 
@@ -58,35 +59,41 @@ export default class SubscriptionCardsController {
             const pdfPath = path.join(tmpDir, `card_${uniqueCode}.pdf`)
             await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
 
-            // 🧾 Génération du PDF de la carte
+            //Génération du PDF de la carte
             await generateSubscriptionCardPDF({
                 outputPath: pdfPath,
                 data: {
                     fullName: `${subscriber.firstName} ${subscriber.lastName}`,
-                    reference: paymentVoucher.referenceCode,
+                    email: subscriber.email,
+                    phoneNumber: subscriber.phoneNumber,
                     category: type.category,
-                    startDate: subscription.startDate.toFormat('dd/MM/yyyy'),
-                    endDate: subscription.endDate.toFormat('dd/MM/yyyy'),
-                    qrPath,
-                    uniqueCode,
+                    startDate: (existingCard?.issuedAt ?? subscription.startDate).toFormat(
+                        'dd/MM/yyyy',
+                    ),
+                    endDate: (existingCard?.expiresAt ?? subscription.endDate).toFormat(
+                        'dd/MM/yyyy',
+                    ),
+                    reference: existingCard?.uniqueCode ?? uniqueCode,
+                    qrCodePath: qrPath,
                 },
             })
 
-            // 📤 Téléchargement du PDF généré
+            //Téléchargement du PDF généré
             response.header('Content-Disposition', `attachment; filename="carte_${uniqueCode}.pdf"`)
             await response.download(pdfPath)
 
-            // Si aucune carte active n’existe, l’enregistrer en base
+            //Si aucune carte active n’existe encore, l’enregistrer
             if (!existingCard) {
                 await SubscriptionCard.create({
                     subscriptionId: subscription.id,
                     uniqueCode,
                     issuedAt: DateTime.now(),
+                    expiresAt: subscription.endDate,
                     isActive: true,
                 })
             }
 
-            //Nettoyage du dossier temporaire
+            //Nettoyage du dossier temporaire après 3 secondes
             setTimeout(() => {
                 fs.rmSync(tmpDir, { recursive: true, force: true })
             }, 3000)
@@ -205,7 +212,7 @@ export default class SubscriptionCardsController {
                 return response.notFound({ message: 'Carte introuvable.' })
             }
 
-            //(Optionnel) Vérifie que seul un admin/manager peut activer
+            //Vérifie que seul un admin/manager peut activer
             if (user.role !== 'admin' && user.role !== 'manager') {
                 return response.forbidden({
                     message: 'Seul un administrateur ou manager peut activer une carte.',
@@ -240,6 +247,51 @@ export default class SubscriptionCardsController {
             })
         } catch (error) {
             return handleError(response, error, 'Erreur lors de l’activation de la carte.')
+        }
+    }
+
+    /**
+     * Vérifie toutes les cartes expirées et les désactive automatiquement
+     * Endpoint suggéré : `PATCH /maintenance/cards/expire`
+     */
+    async checkExpiredCards({ response }: HttpContext) {
+        try {
+            const now = DateTime.now()
+            const expiredCards = await SubscriptionCard.query()
+                .where('is_active', true)
+                .where('expires_at', '<', now.toSQL())
+                .preload('subscription', (sub) => sub.preload('subscriber'))
+
+            if (expiredCards.length === 0) {
+                return response.ok({
+                    status: 'success',
+                    message: 'Aucune carte expirée à désactiver.',
+                    count: 0,
+                })
+            }
+            for (const card of expiredCards) {
+                card.isActive = false
+                await card.save()
+            }
+            const summary = expiredCards.map((c) => ({
+                id: c.id,
+                uniqueCode: c.uniqueCode,
+                subscriber:
+                    `${c.subscription?.subscriber?.firstName ?? ''} ${c.subscription?.subscriber?.lastName ?? ''}`.trim(),
+                expiredAt: c.expiresAt?.toFormat('dd/MM/yyyy'),
+            }))
+
+            return response.ok({
+                status: 'success',
+                message: `${expiredCards.length} carte(s) désactivée(s) automatiquement.`,
+                data: summary,
+            })
+        } catch (error) {
+            return handleError(
+                response,
+                error,
+                'Erreur lors de la vérification des cartes expirées.',
+            )
         }
     }
 }

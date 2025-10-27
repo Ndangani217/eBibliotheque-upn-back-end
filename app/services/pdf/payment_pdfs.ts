@@ -21,7 +21,7 @@ export async function generateVoucherPDF({ outputPath, data }: PDFData) {
         const baseY = bodyY + 25
         const spacing = 25
 
-        // ✅ Traduction catégorie FR
+        // Traduction catégorie FR
         const categoryLabel =
             data.category === 'researcher'
                 ? 'Chercheur'

@@ -20,6 +20,8 @@ export default class extends BaseSchema {
                 .inTable('subscriptions')
                 .onDelete('CASCADE')
 
+            table.timestamp('expires_at', { useTz: true }).nullable()
+
             table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
             table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
         })
