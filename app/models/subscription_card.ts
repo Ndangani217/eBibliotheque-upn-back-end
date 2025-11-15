@@ -2,7 +2,6 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo, beforeCreate } from '@adonisjs/lucid/orm'
 import Subscription from '#models/subscription'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
-import { CardStatus } from '#enums/library_enums'
 
 export default class SubscriptionCard extends BaseModel {
     @column({ isPrimary: true })

@@ -7,6 +7,8 @@ import fs from 'node:fs'
 import { DateTime } from 'luxon'
 import { randomUUID } from 'node:crypto'
 import { handleError } from '#helpers/handle_error'
+import { getAuthenticatedUser } from '#helpers/auth_helper'
+import { downloadPDF } from '#helpers/file_helper'
 import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf'
 
 export default class SubscriptionCardsController {
@@ -17,10 +19,8 @@ export default class SubscriptionCardsController {
      */
     async generateCard({ params, response, auth }: HttpContext) {
         try {
-            const user = auth.user
-            if (!user) {
-                return response.unauthorized({ message: 'Utilisateur non authentifié.' })
-            }
+            const user = getAuthenticatedUser(auth, response)
+            if (!user) return
 
             //Recherche l’abonnement lié au bon de paiement
             const subscription = await Subscription.query()
@@ -79,10 +79,9 @@ export default class SubscriptionCardsController {
             })
 
             //Téléchargement du PDF généré
-            response.header('Content-Disposition', `attachment; filename="carte_${uniqueCode}.pdf"`)
-            await response.download(pdfPath)
+            await downloadPDF(response, pdfPath, `carte_${uniqueCode}.pdf`, 3000, tmpDir)
 
-            //Si aucune carte active n’existe encore, l’enregistrer
+            //Si aucune carte active n'existe encore, l'enregistrer
             if (!existingCard) {
                 await SubscriptionCard.create({
                     subscriptionId: subscription.id,
@@ -92,11 +91,6 @@ export default class SubscriptionCardsController {
                     isActive: true,
                 })
             }
-
-            //Nettoyage du dossier temporaire après 3 secondes
-            setTimeout(() => {
-                fs.rmSync(tmpDir, { recursive: true, force: true })
-            }, 3000)
         } catch (error) {
             return handleError(response, error, 'Erreur lors de la génération de la carte.')
         }

@@ -46,6 +46,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column.dateTime({ columnName: 'verify_expires', serializeAs: null })
     declare verifyExpires: DateTime | null
 
+    @column.dateTime({ columnName: 'reset_expires', serializeAs: null })
+    declare resetExpires: DateTime | null
+
     /**  Statuts du compte */
     @column({ columnName: 'is_verified', serializeAs: 'isVerified' })
     declare isVerified: boolean

@@ -44,6 +44,9 @@ export default class PaymentVoucher extends BaseModel {
     @column.dateTime()
     declare validatedAt: DateTime | null
 
+    @column.dateTime()
+    declare expiresAt: DateTime | null
+
     @belongsTo(() => User, { foreignKey: 'subscriberId' })
     declare subscriber: BelongsTo<typeof User>
 
@@ -75,17 +78,13 @@ export default class PaymentVoucher extends BaseModel {
         }
     }
 
-    /** Vérifie automatiquement l’expiration du bon */
+    /** Vérifie automatiquement l'expiration du bon */
     @beforeSave()
     static async checkExpiration(voucher: PaymentVoucher) {
-        const type = await voucher.related('subscriptionType').query().first()
-        if (type) {
-            const baseDate = voucher.createdAt || DateTime.now()
-            const expirationDate = baseDate.plus({ months: type.durationMonths })
-            if (DateTime.now() > expirationDate && voucher.status !== VoucherStatus.EXPIRE) {
-                voucher.status = VoucherStatus.EXPIRE
-                console.log(`Bon ${voucher.referenceCode} marqué comme expiré.`)
-            }
+        // Si expiresAt est défini et que la date est passée, marquer comme expiré
+        if (voucher.expiresAt && DateTime.now() > voucher.expiresAt && voucher.status !== VoucherStatus.EXPIRE) {
+            voucher.status = VoucherStatus.EXPIRE
+            console.log(`Bon ${voucher.referenceCode} marqué comme expiré.`)
         }
     }
 }

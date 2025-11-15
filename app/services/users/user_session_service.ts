@@ -1,10 +1,10 @@
-// app/services/user_session_service.ts
+// app/services/users/user_session_service.ts
 import { DateTime } from 'luxon'
 import User from '#models/user'
 import UserSession from '#models/user_session'
 import type { HttpContext } from '@adonisjs/core/http'
 
-class UserSessionService {
+export class UserSessionService {
     /**
      * 🔹 Démarre une session (login)
      */
@@ -69,4 +69,5 @@ class UserSessionService {
     }
 }
 
+// Instance singleton pour compatibilité avec les imports existants
 export default new UserSessionService()

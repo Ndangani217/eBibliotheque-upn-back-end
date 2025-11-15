@@ -23,7 +23,7 @@ export default class CreatePaymentVouchersTable extends BaseSchema {
                 .references('id')
                 .inTable('subscription_types')
                 .onDelete('CASCADE')
-
+            table.timestamp('expires_at', { useTz: true }).nullable()
             table.string('qr_code').nullable()
 
             table.timestamp('created_at', { useTz: true }).defaultTo(this.now())

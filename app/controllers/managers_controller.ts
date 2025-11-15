@@ -5,10 +5,16 @@ import Subscription from '#models/subscription'
 import PaymentVoucher from '#models/payment_voucher'
 import SubscriptionCard from '#models/subscription_card'
 import { handleError } from '#helpers/handle_error'
+import { downloadPDF, downloadExcel } from '#helpers/file_helper'
 import { generateSubscriptionCardPDF } from '#services/pdf/subscription_card_pdf'
+import { ExcelService } from '#services/excel/excel_service'
+import { UserService } from '#services/users/user_service'
+import { AuthService } from '#services/auth/auth_service'
+import { ApiResponseHelper } from '#helpers/api_response'
 import path from 'node:path'
 import fs from 'node:fs'
 import QRCode from 'qrcode'
+import { randomUUID } from 'node:crypto'
 import { UserRole, VoucherStatus, SubscriptionStatus, CardStatus } from '#enums/library_enums'
 
 export default class ManagerController {
@@ -122,6 +128,7 @@ export default class ManagerController {
             const query = Subscription.query()
                 .preload('subscriber')
                 .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
+                .preload('card')
                 .orderBy('created_at', 'desc')
                 .if(status, (q) => q.where('status', status))
                 .if(search, (q) => {
@@ -149,6 +156,7 @@ export default class ManagerController {
                 startDate: s.startDate,
                 endDate: s.endDate,
                 status: s.status,
+                cardId: s.card?.id ?? null,
             }))
 
             //Réponse standardisée
@@ -299,19 +307,98 @@ export default class ManagerController {
             })
 
             // Téléchargement direct
-            response.header(
-                'Content-Disposition',
-                `attachment; filename="carte-${card.uniqueCode}.pdf"`,
-            )
-            response.type('application/pdf')
-            await response.download(pdfPath)
-
-            // Nettoyage automatique après 3 sec
-            setTimeout(() => {
-                fs.rmSync(tmpDir, { recursive: true, force: true })
-            }, 3000)
+            await downloadPDF(response, pdfPath, `carte-${card.uniqueCode}.pdf`, 3000, tmpDir)
         } catch (error) {
             console.error('Erreur impression carte:', error)
+            return handleError(response, error, 'Erreur lors de la génération du PDF de la carte.')
+        }
+    }
+
+    /**
+     * Impression PDF d'une carte à partir de l'ID de l'abonnement
+     * Génère la carte si elle n'existe pas encore
+     */
+    async printCardBySubscription({ params, response }: HttpContext) {
+        try {
+            const subscription = await Subscription.query()
+                .where('id', params.id)
+                .preload('subscriber')
+                .preload('paymentVoucher', (pv) => pv.preload('subscriptionType'))
+                .preload('card')
+                .firstOrFail()
+
+            const subscriber = subscription.subscriber
+            const type = subscription.paymentVoucher.subscriptionType
+
+            // Vérifie si l'abonnement est valide
+            const now = DateTime.now()
+            if (subscription.status !== SubscriptionStatus.VALIDE) {
+                return response.badRequest({ message: "Cet abonnement n'est pas valide." })
+            }
+
+            if (now > subscription.endDate) {
+                return response.badRequest({ message: 'Cet abonnement est expiré.' })
+            }
+
+            // Récupère ou crée la carte
+            let card = await subscription.related('card').query().first()
+
+            if (!card || !card.isActive) {
+                // Génère un nouveau code unique
+                const uniqueCode = `CARD-${randomUUID()}`
+
+                // Crée la carte si elle n'existe pas
+                if (!card) {
+                    card = await SubscriptionCard.create({
+                        subscriptionId: subscription.id,
+                        uniqueCode,
+                        issuedAt: DateTime.now(),
+                        expiresAt: subscription.endDate,
+                        isActive: true,
+                    })
+                } else {
+                    // Réactive la carte existante
+                    card.isActive = true
+                    card.uniqueCode = uniqueCode
+                    card.issuedAt = DateTime.now()
+                    card.expiresAt = subscription.endDate
+                    await card.save()
+                }
+            }
+
+            // Vérifie si la carte est expirée
+            if (card.expiresAt < now) {
+                return response.badRequest({ message: 'Cette carte est expirée.' })
+            }
+
+            // === Dossiers temporaires ===
+            const tmpDir = path.resolve('tmp/cards')
+            fs.mkdirSync(tmpDir, { recursive: true })
+
+            const qrPath = path.join(tmpDir, `qr_${card.uniqueCode}.png`)
+            const pdfPath = path.join(tmpDir, `card_${card.uniqueCode}.pdf`)
+            const verifyUrl = `https://ebibliotheque-upn.cd/verify/${card.uniqueCode}`
+
+            await QRCode.toFile(qrPath, verifyUrl, { width: 250 })
+
+            await generateSubscriptionCardPDF({
+                outputPath: pdfPath,
+                data: {
+                    fullName: `${subscriber.firstName} ${subscriber.lastName}`,
+                    email: subscriber.email,
+                    phoneNumber: subscriber.phoneNumber,
+                    category: type.category,
+                    startDate: card.issuedAt.toFormat('dd/MM/yyyy'),
+                    endDate: card.expiresAt.toFormat('dd/MM/yyyy'),
+                    reference: card.uniqueCode,
+                    qrCodePath: qrPath,
+                },
+            })
+
+            // Téléchargement direct
+            await downloadPDF(response, pdfPath, `carte-${card.uniqueCode}.pdf`, 3000, tmpDir)
+        } catch (error) {
+            console.error('Erreur impression carte par abonnement:', error)
             return handleError(response, error, 'Erreur lors de la génération du PDF de la carte.')
         }
     }
@@ -382,6 +469,155 @@ export default class ManagerController {
                 status: 'error',
                 message: "Erreur lors de la suspension de l'abonnement",
             })
+        }
+    }
+
+    /**
+     * Valide les dates d'export et retourne la période
+     */
+    private validateExportPeriod(
+        startDate: string | undefined,
+        endDate: string | undefined,
+        response: HttpContext['response'],
+    ) {
+        if (!startDate || !endDate) {
+            response.badRequest({
+                status: 'error',
+                message: 'Les dates de début et de fin sont requises',
+            })
+            return null
+        }
+
+        return {
+            startDate: DateTime.fromISO(startDate),
+            endDate: DateTime.fromISO(endDate),
+        }
+    }
+
+    /**
+     * Export Excel des fiches de paiement
+     */
+    async exportPayments({ request, response }: HttpContext) {
+        try {
+            const period = this.validateExportPeriod(
+                request.input('startDate'),
+                request.input('endDate'),
+                response,
+            )
+            if (!period) return
+
+            const filePath = await ExcelService.generatePaymentsExcel(period)
+            const fileName = `paiements_${period.startDate.toFormat('yyyy-MM-dd')}_${period.endDate.toFormat('yyyy-MM-dd')}.xlsx`
+
+            await downloadExcel(response, filePath, fileName, 5000)
+        } catch (error) {
+            console.error('Erreur export paiements:', error)
+            return handleError(response, error, "Erreur lors de l'export des paiements")
+        }
+    }
+
+    /**
+     * Export Excel des abonnements actifs
+     */
+    async exportActiveSubscriptions({ request, response }: HttpContext) {
+        try {
+            const period = this.validateExportPeriod(
+                request.input('startDate'),
+                request.input('endDate'),
+                response,
+            )
+            if (!period) return
+
+            const filePath = await ExcelService.generateActiveSubscriptionsExcel(period)
+            const fileName = `abonnements_actifs_${period.startDate.toFormat('yyyy-MM-dd')}_${period.endDate.toFormat('yyyy-MM-dd')}.xlsx`
+
+            await downloadExcel(response, filePath, fileName, 5000)
+        } catch (error) {
+            console.error('Erreur export abonnements actifs:', error)
+            return handleError(response, error, "Erreur lors de l'export des abonnements actifs")
+        }
+    }
+
+    /**
+     * Export Excel des abonnements expirés
+     */
+    async exportExpiredSubscriptions({ request, response }: HttpContext) {
+        try {
+            const period = this.validateExportPeriod(
+                request.input('startDate'),
+                request.input('endDate'),
+                response,
+            )
+            if (!period) return
+
+            const filePath = await ExcelService.generateExpiredSubscriptionsExcel(period)
+            const fileName = `abonnements_expires_${period.startDate.toFormat('yyyy-MM-dd')}_${period.endDate.toFormat('yyyy-MM-dd')}.xlsx`
+
+            await downloadExcel(response, filePath, fileName, 5000)
+        } catch (error) {
+            console.error('Erreur export abonnements expirés:', error)
+            return handleError(response, error, "Erreur lors de l'export des abonnements expirés")
+        }
+    }
+
+    /**
+     * Liste des abonnés avec pagination et recherche
+     */
+    async subscribers({ request, response }: HttpContext) {
+        try {
+            const page = request.input('page', 1)
+            const limit = request.input('limit', 10)
+            const search = (request.input('search', '') as string).trim()
+
+            const subscribers = await UserService.listUsers({
+                page,
+                limit,
+                search,
+                roles: [UserRole.SUBSCRIBER],
+                verified: true,
+            })
+
+            const sanitized = subscribers.serialize({
+                fields: {
+                    omit: ['password', 'verifyToken', 'verifyExpires', 'resetToken', 'resetExpires'],
+                },
+            })
+
+            return ApiResponseHelper.success(
+                response,
+                sanitized,
+                'Liste des abonnés récupérée avec succès',
+                subscribers.getMeta(),
+            )
+        } catch (error) {
+            console.error('Erreur subscribers ManagerController:', error)
+            return handleError(response, error, 'Impossible de récupérer la liste des abonnés')
+        }
+    }
+
+    /**
+     * Envoie un lien de réinitialisation de mot de passe à un abonné
+     */
+    async sendPasswordResetLink({ params, response }: HttpContext) {
+        try {
+            const user = await User.findOrFail(params.id)
+
+            if (user.role !== UserRole.SUBSCRIBER) {
+                return ApiResponseHelper.error(
+                    response,
+                    'Cette action est réservée aux abonnés uniquement.',
+                    403,
+                )
+            }
+
+            const result = await AuthService.requestPasswordReset(user.email)
+
+            return ApiResponseHelper.success(response, null, result.message)
+        } catch (error: any) {
+            if (error.message === 'Row not found') {
+                return ApiResponseHelper.notFound(response, 'Utilisateur non trouvé')
+            }
+            return handleError(response, error, 'Impossible d\'envoyer le lien de réinitialisation')
         }
     }
 }
