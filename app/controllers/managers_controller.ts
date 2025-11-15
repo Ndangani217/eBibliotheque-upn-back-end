@@ -16,6 +16,7 @@ import fs from 'node:fs'
 import QRCode from 'qrcode'
 import { randomUUID } from 'node:crypto'
 import { UserRole, VoucherStatus, SubscriptionStatus, CardStatus } from '#enums/library_enums'
+import { ActivityLogger } from '#services/activity_logger'
 
 export default class ManagerController {
     /**
@@ -239,16 +240,22 @@ export default class ManagerController {
     /**
      * Activation d’une carte
      */
-    async activateCard({ params, response }: HttpContext) {
+    async activateCard({ params, auth, request, response }: HttpContext) {
         try {
             const card = await SubscriptionCard.findOrFail(params.id)
             card.isActive = true
             await card.save()
 
-            return response.ok({
+            const res = response.ok({
                 status: 'success',
                 message: 'Carte activée avec succès',
             })
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'activate_card',
+                { entityType: 'subscription_card', entityId: card.id }
+            )
+            return res
         } catch (error) {
             return handleError(response, error, 'Impossible d’activer la carte')
         }
@@ -257,7 +264,7 @@ export default class ManagerController {
     /**
      *Impression PDF d’une carte
      */
-    async printCard({ params, response }: HttpContext) {
+    async printCard({ params, auth, request, response }: HttpContext) {
         try {
             const card = await SubscriptionCard.query()
                 .where('id', params.id)
@@ -308,6 +315,11 @@ export default class ManagerController {
 
             // Téléchargement direct
             await downloadPDF(response, pdfPath, `carte-${card.uniqueCode}.pdf`, 3000, tmpDir)
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'print_card',
+                { entityType: 'subscription_card', entityId: card.id }
+            )
         } catch (error) {
             console.error('Erreur impression carte:', error)
             return handleError(response, error, 'Erreur lors de la génération du PDF de la carte.')
@@ -318,7 +330,7 @@ export default class ManagerController {
      * Impression PDF d'une carte à partir de l'ID de l'abonnement
      * Génère la carte si elle n'existe pas encore
      */
-    async printCardBySubscription({ params, response }: HttpContext) {
+    async printCardBySubscription({ params, auth, request, response }: HttpContext) {
         try {
             const subscription = await Subscription.query()
                 .where('id', params.id)
@@ -397,6 +409,11 @@ export default class ManagerController {
 
             // Téléchargement direct
             await downloadPDF(response, pdfPath, `carte-${card.uniqueCode}.pdf`, 3000, tmpDir)
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'print_card_by_subscription',
+                { entityType: 'subscription', entityId: subscription.id }
+            )
         } catch (error) {
             console.error('Erreur impression carte par abonnement:', error)
             return handleError(response, error, 'Erreur lors de la génération du PDF de la carte.')
@@ -435,7 +452,7 @@ export default class ManagerController {
     /**
      * Suspendre un abonnement actif
      */
-    async suspendCard({ params, response }: HttpContext) {
+    async suspendCard({ params, auth, request, response }: HttpContext) {
         try {
             const id = params.id
 
@@ -455,7 +472,7 @@ export default class ManagerController {
             }
             subscription.status = SubscriptionStatus.SUSPENDU
             await subscription.save()
-            return response.ok({
+            const res = response.ok({
                 status: 'success',
                 message: 'Abonnement suspendu avec succès',
                 data: {
@@ -463,6 +480,12 @@ export default class ManagerController {
                     newStatus: subscription.status,
                 },
             })
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'suspend_subscription',
+                { entityType: 'subscription', entityId: subscription.id }
+            )
+            return res
         } catch (error) {
             console.error(error)
             return response.status(500).json({
@@ -497,7 +520,7 @@ export default class ManagerController {
     /**
      * Export Excel des fiches de paiement
      */
-    async exportPayments({ request, response }: HttpContext) {
+    async exportPayments({ request, auth, response }: HttpContext) {
         try {
             const period = this.validateExportPeriod(
                 request.input('startDate'),
@@ -510,6 +533,11 @@ export default class ManagerController {
             const fileName = `paiements_${period.startDate.toFormat('yyyy-MM-dd')}_${period.endDate.toFormat('yyyy-MM-dd')}.xlsx`
 
             await downloadExcel(response, filePath, fileName, 5000)
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'export_payments',
+                { metadata: { fileName } }
+            )
         } catch (error) {
             console.error('Erreur export paiements:', error)
             return handleError(response, error, "Erreur lors de l'export des paiements")
@@ -519,7 +547,7 @@ export default class ManagerController {
     /**
      * Export Excel des abonnements actifs
      */
-    async exportActiveSubscriptions({ request, response }: HttpContext) {
+    async exportActiveSubscriptions({ request, auth, response }: HttpContext) {
         try {
             const period = this.validateExportPeriod(
                 request.input('startDate'),
@@ -532,6 +560,11 @@ export default class ManagerController {
             const fileName = `abonnements_actifs_${period.startDate.toFormat('yyyy-MM-dd')}_${period.endDate.toFormat('yyyy-MM-dd')}.xlsx`
 
             await downloadExcel(response, filePath, fileName, 5000)
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'export_active_subscriptions',
+                { metadata: { fileName } }
+            )
         } catch (error) {
             console.error('Erreur export abonnements actifs:', error)
             return handleError(response, error, "Erreur lors de l'export des abonnements actifs")
@@ -541,7 +574,7 @@ export default class ManagerController {
     /**
      * Export Excel des abonnements expirés
      */
-    async exportExpiredSubscriptions({ request, response }: HttpContext) {
+    async exportExpiredSubscriptions({ request, auth, response }: HttpContext) {
         try {
             const period = this.validateExportPeriod(
                 request.input('startDate'),
@@ -554,6 +587,11 @@ export default class ManagerController {
             const fileName = `abonnements_expires_${period.startDate.toFormat('yyyy-MM-dd')}_${period.endDate.toFormat('yyyy-MM-dd')}.xlsx`
 
             await downloadExcel(response, filePath, fileName, 5000)
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'export_expired_subscriptions',
+                { metadata: { fileName } }
+            )
         } catch (error) {
             console.error('Erreur export abonnements expirés:', error)
             return handleError(response, error, "Erreur lors de l'export des abonnements expirés")

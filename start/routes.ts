@@ -37,6 +37,7 @@ router.patch('/maintenance/vouchers/expire', [PaymentVouchersController, 'expire
    MANAGER DASHBOARD & ADMINISTRATION
    ========================================================================== */
 const ManagerController = () => import('#controllers/managers_controller')
+const ActivityLogsController = () => import('#controllers/activity_logs_controller')
 
 router
     .group(() => {
@@ -59,6 +60,7 @@ router
         router.get('/subscriptions/expiring-soon', [ManagerController, 'expiringSoon'])
         router.get('/users', [ManagerController, 'subscribers'])
         router.post('/users/:id/send-password-reset', [ManagerController, 'sendPasswordResetLink'])
+        router.get('/activity-logs', [ActivityLogsController, 'index']).use(namedMiddleware.auth())
     })
     .prefix('/manager')
 

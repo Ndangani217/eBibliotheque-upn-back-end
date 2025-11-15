@@ -16,6 +16,7 @@ import { getAuthenticatedUser } from '#helpers/auth_helper'
 import { getActiveSubscription } from '#helpers/subscription_helper'
 import { downloadPDF } from '#helpers/file_helper'
 import { randomUUID } from 'node:crypto'
+import { ActivityLogger } from '#services/activity_logger'
 
 export default class PaymentVouchersController {
     /**
@@ -145,7 +146,7 @@ export default class PaymentVouchersController {
      * - Crée l’abonnement actif
      * - Génère la carte immédiatement active
      */
-    async validatePayment({ params, response }: HttpContext) {
+    async validatePayment({ params, auth, request, response }: HttpContext) {
         try {
             console.log('--- DÉBUT VALIDATION DU PAIEMENT ---')
 
@@ -255,13 +256,19 @@ export default class PaymentVouchersController {
             }, 10000)
 
             // Réponse finale
-            return response.ok({
+            const result = {
                 message: 'Paiement validé — Abonnement et carte activés automatiquement.',
                 voucher,
                 subscription,
                 card,
                 qr_preview: qrBase64,
-            })
+            }
+            await ActivityLogger.log(
+                { auth, request, response } as HttpContext,
+                'validate_payment',
+                { entityType: 'payment_voucher', entityId: voucher.id, metadata: { reference: voucher.referenceCode } }
+            )
+            return response.ok(result)
         } catch (error) {
             console.error('Erreur validatePayment:', error)
             return handleError(response, error, 'Erreur lors de la validation du paiement.')

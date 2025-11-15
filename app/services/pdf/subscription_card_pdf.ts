@@ -24,10 +24,10 @@ export async function generateSubscriptionCardPDF({ outputPath, data }: PDFData)
     // 400x250 points ≈ 14.1 x 8.8 cm (taille carte de crédit)
     const cardWidth = 400
     const cardHeight = 250
-    const doc = new PDFDocument({ 
-        size: [cardWidth, cardHeight], 
+    const doc = new PDFDocument({
+        size: [cardWidth, cardHeight],
         margin: 0,
-        bufferPages: true // Activer le buffer pour contrôler les pages
+        bufferPages: true, // Activer le buffer pour contrôler les pages
     })
 
     await new Promise<void>((resolve, reject) => {
@@ -62,7 +62,7 @@ export async function generateSubscriptionCardPDF({ outputPath, data }: PDFData)
             doc.text(`Adresse e-mail : ${data.email}`, infoX, (infoY += lineGap))
             doc.text(`Téléphone : ${data.phoneNumber}`, infoX, (infoY += lineGap))
             doc.text(`Catégorie : ${formatCategory(data.category)}`, infoX, (infoY += lineGap))
-            doc.text(`Période : du ${data.startDate} au ${data.endDate}`, infoX, (infoY += lineGap))
+            doc.text(`Période : du ${data.startDate} au ${(data as any).endDate ?? data.startDate}`, infoX, (infoY += lineGap))
 
             // ==== QR code ====
             if (data.qrCodePath && fs.existsSync(data.qrCodePath)) {
@@ -80,13 +80,13 @@ export async function generateSubscriptionCardPDF({ outputPath, data }: PDFData)
                 .fontSize(9)
                 .text('Université Pédagogique Nationale — eBibliothèque UPN', 0, 228, {
                     align: 'center',
-                    width: cardWidth
+                    width: cardWidth,
                 })
             doc.fontSize(8)
                 .fillColor('#e0e7ff')
-                .text('« La digitalisation en marche »', 0, 240, { 
+                .text('« La digitalisation en marche »', 0, 240, {
                     align: 'center',
-                    width: cardWidth
+                    width: cardWidth,
                 })
 
             // ==== Signature officielle UPN ====
@@ -95,14 +95,14 @@ export async function generateSubscriptionCardPDF({ outputPath, data }: PDFData)
                 .fontSize(7)
                 .text('Signature officielle UPN', 0, 200, {
                     align: 'center',
-                    width: cardWidth
+                    width: cardWidth,
                 })
             doc.font('Helvetica')
                 .fontSize(6)
                 .fillColor('#475569')
                 .text('Université Pédagogique Nationale', 0, 210, {
                     align: 'center',
-                    width: cardWidth
+                    width: cardWidth,
                 })
 
             // S'assurer qu'on n'a qu'une seule page
