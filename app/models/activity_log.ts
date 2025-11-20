@@ -3,34 +3,34 @@ import { DateTime } from 'luxon'
 
 export default class ActivityLog extends BaseModel {
   @column({ isPrimary: true })
-  public id: number
+  declare id: number
 
   @column()
-  public userId: string
+  declare userId: string
 
   @column()
-  public role: string
+  declare role: string
 
   @column()
-  public action: string
+  declare action: string
 
   @column()
-  public entityType?: string | null
+  declare entityType: string | null
 
   @column()
-  public entityId?: string | null
+  declare entityId: string | null
 
   @column()
-  public metadata?: any
+  declare metadata: any
 
   @column()
-  public ipAddress?: string | null
+  declare ipAddress: string | null
 
   @column()
-  public userAgent?: string | null
+  declare userAgent: string | null
 
   @column.dateTime({ autoCreate: true })
-  public createdAt: DateTime
+  declare createdAt: DateTime
 }
 
 
