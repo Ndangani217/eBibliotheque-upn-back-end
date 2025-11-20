@@ -8,7 +8,7 @@ export default class UserSession extends BaseModel {
     declare id: number
 
     @column({ columnName: 'user_id' })
-    declare userId: number
+    declare userId: string
 
     @column.dateTime({ columnName: 'login_at' })
     declare loginAt: DateTime

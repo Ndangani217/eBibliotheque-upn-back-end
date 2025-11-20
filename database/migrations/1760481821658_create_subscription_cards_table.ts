@@ -1,0 +1,28 @@
+import { BaseSchema } from '@adonisjs/lucid/schema'
+
+export default class extends BaseSchema {
+    protected tableName = 'subscription_cards'
+
+    async up() {
+        this.schema.createTable(this.tableName, (table) => {
+            table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))
+            table.string('qr_code').notNullable()
+            table.string('file_path').notNullable()
+            table.timestamp('issued_at', { useTz: true }).notNullable()
+            table.boolean('is_active').defaultTo(true)
+
+            table
+                .uuid('subscription_id')
+                .references('id')
+                .inTable('subscriptions')
+                .onDelete('CASCADE')
+
+            table.timestamp('created_at')
+            table.timestamp('updated_at')
+        })
+    }
+
+    async down() {
+        this.schema.dropTable(this.tableName)
+    }
+}

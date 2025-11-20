@@ -15,7 +15,7 @@ class UserSessionService {
             .update({ logoutAt: DateTime.now() })
 
         return await UserSession.create({
-            userId: user.id,
+            userId: String(user.id),
             loginAt: DateTime.now(),
             logoutAt: null,
             ip,

@@ -24,6 +24,7 @@
         "#types/*": "./app/types/*.js",
         "#tasks/*": "./app/tasks/*.js",
         "#helpers/*": "./app/helpers/*.js",
+        "#enums/*": "./app/enums/*.js",
         "#listeners/*": "./app/listeners/*.js",
         "#events/*": "./app/events/*.js",
         "#middleware/*": "./app/middleware/*.js",
