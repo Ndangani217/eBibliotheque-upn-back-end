@@ -1,187 +1,174 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import User from '#models/user'
-import crypto from 'node:crypto'
-import { DateTime } from 'luxon'
 import { handleError } from '#helpers/handle_error'
-import UserSessionService from '#services/user_session'
+import { ApiResponseHelper } from '#helpers/api_response'
+import { AuthService } from '#services/auth/auth_service'
 import {
     LoginValidator,
-    ActivateAccountValidator,
     RequestPasswordResetValidator,
     ResetPasswordValidator,
+    SetPasswordValidator,
 } from '#validators/auth'
 
 export default class AuthController {
-    /**
-     * POST /auth/login
-     * Authentifie l’utilisateur et crée une session
-     */
-    async storeSession({ request, auth, response }: HttpContext) {
+    async storeSession({ request, response, ...httpContext }: HttpContext) {
         try {
             const { email, password } = await request.validateUsing(LoginValidator)
-            const user = await User.findBy('email', email)
+            const result = await AuthService.login(email, password, {
+                request,
+                response,
+                ...httpContext,
+            } as HttpContext)
 
-            if (!user || !user.isVerified)
-                return response.unauthorized({ status: 'error', message: 'Identifiants invalides' })
-
-            if (user.isBlocked)
-                return response.forbidden({
-                    status: 'error',
-                    message: 'Votre compte est bloqué, contactez l’administration',
-                })
-
-            const verifiedUser = await User.verifyCredentials(email, password)
-            const token = await auth.use('api').createToken(verifiedUser)
-            await UserSessionService.start(verifiedUser, { request } as HttpContext)
-
-            return response.ok({
-                status: 'success',
-                message: 'Connexion réussie',
-                data: { token, user: verifiedUser },
-            })
-        } catch (error) {
-            return handleError(response, error, 'Impossible de se connecter')
+            return ApiResponseHelper.success(
+                response,
+                {
+                    accessToken: result.accessToken,
+                    refreshToken: result.refreshToken,
+                    user: result.user,
+                },
+                'Login successful',
+            )
+        } catch (error: any) {
+            if (error.message === 'Invalid credentials or account not verified.') {
+                return ApiResponseHelper.unauthorized(response, error.message)
+            }
+            if (error.message === 'Your account is blocked. Please contact the administrator.') {
+                return ApiResponseHelper.forbidden(response, error.message)
+            }
+            return handleError(response, error, 'Unable to log in')
         }
     }
 
-    /**
-     * DELETE /auth/logout
-     * Termine la session de l’utilisateur connecté
-     */
-    async destroySession({ auth, response }: HttpContext) {
+    async destroySession({ auth, response, ...httpContext }: HttpContext) {
         try {
             const user = auth.user
-            if (!user) return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+            if (!user) {
+                return ApiResponseHelper.unauthorized(response, 'Not authenticated')
+            }
 
-            await auth.use('api').invalidateToken()
-            await UserSessionService.end(user.id)
+            await AuthService.logout(user, { auth, response, ...httpContext } as HttpContext)
 
-            return response.ok({ status: 'success', message: 'Déconnexion réussie' })
+            return ApiResponseHelper.success(response, null, 'Logout successful')
         } catch (error) {
-            return handleError(response, error, 'Impossible de se déconnecter')
+            return handleError(response, error, 'Unable to log out')
         }
     }
 
-    /**
-     * GET /auth/me
-     * Renvoie les infos de l’utilisateur authentifié
-     */
-    async showAuthenticatedUser({ auth, response }: HttpContext) {
+    async setPassword({ request, params, response }: HttpContext) {
         try {
-            if (!auth.user)
-                return response.unauthorized({ status: 'error', message: 'Non authentifié' })
+            const token = params.token
+            const { newPassword } = await request.validateUsing(SetPasswordValidator)
 
-            if (auth.user.isBlocked)
-                return response.forbidden({
-                    status: 'error',
-                    message: 'Votre compte est bloqué, contactez l’administration',
-                })
+            await AuthService.setPassword(token, newPassword)
 
-            return response.ok({ status: 'success', data: { user: auth.user } })
-        } catch (error) {
-            return handleError(response, error, 'Impossible de récupérer le profil')
+            return ApiResponseHelper.success(response, null, 'Mot de passe défini avec succès.')
+        } catch (error: any) {
+            if (error.message === 'Invalid or expired link.') {
+                return ApiResponseHelper.error(response, 'Lien invalide ou expiré.', 400)
+            }
+            return handleError(response, error, 'Impossible de définir le mot de passe')
         }
     }
 
-    /**
-     * POST /auth/activate/:id
-     * Active un compte et définit le mot de passe initial
-     */
-    async activateAccount({ params, request, response }: HttpContext) {
-        try {
-            const { password, token } = await request.validateUsing(ActivateAccountValidator)
-            const user = await User.find(params.id)
-
-            if (!user)
-                return response.notFound({ status: 'error', message: 'Utilisateur introuvable' })
-            if (user.password)
-                return response.badRequest({ status: 'error', message: 'Mot de passe déjà défini' })
-
-            const hashed = crypto.createHash('sha256').update(token).digest('hex')
-            if (user.verifyToken !== hashed)
-                return response.badRequest({
-                    status: 'error',
-                    message: 'Lien d’activation invalide',
-                })
-
-            user.password = password
-            user.isVerified = true
-            user.verifyToken = null
-            await user.save()
-
-            return response.ok({
-                status: 'success',
-                message: 'Compte activé et mot de passe défini',
-                data: { id: user.id, email: user.email },
-            })
-        } catch (error) {
-            return handleError(response, error, 'Impossible d’activer le compte')
-        }
-    }
-
-    /**
-     * POST /auth/forgot-password
-     * Envoie un lien de réinitialisation
-     */
     async requestPasswordReset({ request, response }: HttpContext) {
         try {
             const { email } = await request.validateUsing(RequestPasswordResetValidator)
-            const user = await User.findBy('email', email)
+            const result = await AuthService.requestPasswordReset(email)
 
-            // Réponse générique pour éviter la fuite d’infos
-            if (!user)
-                return response.ok({
-                    status: 'success',
-                    message:
-                        'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
-                })
-
-            const rawToken = crypto.randomBytes(32).toString('hex')
-            const hashed = crypto.createHash('sha256').update(rawToken).digest('hex')
-            user.resetToken = hashed
-            user.resetExpires = DateTime.utc().plus({ hours: 1 })
-            await user.save()
-
-            const resetUrl = `${process.env.FRONT_URL}/reset-password/${rawToken}`
-
-            return response.ok({
-                status: 'success',
-                message: 'Un email de réinitialisation a été envoyé',
-                data: { resetUrl },
-            })
+            return ApiResponseHelper.success(response, null, result.message)
         } catch (error) {
-            return handleError(response, error, 'Impossible d’initier la réinitialisation')
+            return handleError(response, error, 'Unable to initiate password reset')
         }
     }
 
     /**
-     * POST /auth/reset-password/:token
-     * Réinitialise le mot de passe
+     * Vérifie si un token de réinitialisation est valide (GET)
      */
+    async verifyResetToken({ params, response }: HttpContext) {
+        try {
+            const isValid = await AuthService.verifyResetToken(params.token)
+
+            if (!isValid) {
+                return ApiResponseHelper.error(
+                    response,
+                    'Lien de réinitialisation invalide ou expiré.',
+                    404,
+                )
+            }
+
+            return ApiResponseHelper.success(response, { valid: true }, 'Token valide.')
+        } catch (error) {
+            return handleError(response, error, 'Erreur lors de la vérification du token')
+        }
+    }
+
     async resetPassword({ params, request, response }: HttpContext) {
         try {
             const { newPassword } = await request.validateUsing(ResetPasswordValidator)
-            const hashed = crypto.createHash('sha256').update(params.token).digest('hex')
+            await AuthService.resetPassword(params.token, newPassword)
 
-            const user = await User.query()
-                .where('reset_token', hashed)
-                .andWhere('reset_expires', '>', DateTime.utc().toSQL())
-                .first()
+            return ApiResponseHelper.success(response, null, 'Password successfully reset.')
+        } catch (error: any) {
+            if (error.message === 'Invalid or expired password reset link.') {
+                return ApiResponseHelper.error(response, error.message, 400)
+            }
+            return handleError(response, error, 'Unable to reset password')
+        }
+    }
 
-            if (!user)
-                return response.badRequest({ status: 'error', message: 'Lien invalide ou expiré' })
+    async refreshToken({ request, response, ...httpContext }: HttpContext) {
+        try {
+            const { refreshToken } = request.only(['refreshToken'])
 
-            user.password = newPassword
-            user.resetToken = null
-            user.resetExpires = null
-            await user.save()
+            if (!refreshToken) {
+                return ApiResponseHelper.error(response, 'Refresh token missing.', 400)
+            }
 
-            return response.ok({
-                status: 'success',
-                message: 'Mot de passe réinitialisé avec succès',
-            })
-        } catch (error) {
-            return handleError(response, error, 'Impossible de réinitialiser le mot de passe')
+            const result = await AuthService.refreshAccessToken(refreshToken, {
+                request,
+                response,
+                ...httpContext,
+            } as HttpContext)
+
+            return ApiResponseHelper.success(
+                response,
+                {
+                    accessToken: result.accessToken,
+                    refreshToken: result.refreshToken,
+                },
+                'Token refreshed successfully',
+            )
+        } catch (error: any) {
+            if (error.message === 'Invalid or expired refresh token.') {
+                return ApiResponseHelper.unauthorized(response, error.message)
+            }
+            if (error.message === 'User not found.') {
+                return ApiResponseHelper.notFound(response, error.message)
+            }
+            return handleError(response, error, 'Unable to refresh access token')
+        }
+    }
+
+    async showAuthenticatedUser({ response, ...httpContext }: HttpContext) {
+        try {
+            const user = await AuthService.getAuthenticatedUser({
+                response,
+                ...httpContext,
+            } as HttpContext)
+
+            return ApiResponseHelper.success(response, { user }, 'User retrieved successfully')
+        } catch (error: any) {
+            if (error.message === 'Not authenticated') {
+                return ApiResponseHelper.unauthorized(response, 'Non authentifié')
+            }
+            if (error.message === 'Your account is blocked. Please contact the administrator.') {
+                return ApiResponseHelper.forbidden(
+                    response,
+                    "Votre compte est bloqué, contactez l'administration",
+                )
+            }
+            console.error('Auth error:', error)
+            return ApiResponseHelper.unauthorized(response, 'Token invalide ou expiré')
         }
     }
 }

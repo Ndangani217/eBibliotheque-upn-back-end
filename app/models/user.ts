@@ -4,10 +4,9 @@ import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import { UserRole, SubscriberCategory } from '#enums/library_enums'
-import Notification from '#models/notification'
 import Subscription from '#models/subscription'
 import PaymentVoucher from '#models/payment_voucher'
 
@@ -20,7 +19,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column({ isPrimary: true })
     declare id: string
 
-    /** Informations personnelles */
     @column()
     declare name: string
 
@@ -39,6 +37,18 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column()
     declare phoneNumber: string
 
+    @column({ columnName: 'verify_token', serializeAs: null })
+    declare verifyToken: string | null
+
+    @column({ columnName: 'reset_token', serializeAs: null })
+    declare resetToken: string | null
+
+    @column.dateTime({ columnName: 'verify_expires', serializeAs: null })
+    declare verifyExpires: DateTime | null
+
+    @column.dateTime({ columnName: 'reset_expires', serializeAs: null })
+    declare resetExpires: DateTime | null
+
     /**  Statuts du compte */
     @column({ columnName: 'is_verified', serializeAs: 'isVerified' })
     declare isVerified: boolean
@@ -46,29 +56,27 @@ export default class User extends compose(BaseModel, AuthFinder) {
     @column({ columnName: 'is_blocked', serializeAs: 'isBlocked' })
     declare isBlocked: boolean
 
-    /**  Rôle du compte (admin, manager, citizen, etc.) */
     @column()
     declare role: UserRole
 
-    /**  Catégorie d’abonné (étudiant, chercheur, etc.) */
     @column()
     declare category: SubscriberCategory | null
 
-    /** Matricule pour étudiants */
     @column()
     declare matricule: string | null
-
-    /**  Relations */
-    @hasMany(() => Notification)
-    declare notifications: HasMany<typeof Notification>
 
     @hasMany(() => Subscription)
     declare subscriptions: HasMany<typeof Subscription>
 
+    @column({ columnName: 'subscriber_id' })
+    declare subscriberId: string
+
+    @belongsTo(() => User, { foreignKey: 'subscriberId' })
+    declare subscriber: BelongsTo<typeof User>
+
     @hasMany(() => PaymentVoucher)
     declare paymentVouchers: HasMany<typeof PaymentVoucher>
 
-    /** Dates automatiques */
     @column.dateTime({ autoCreate: true })
     declare createdAt: DateTime
 
@@ -77,7 +85,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
     /** Fournisseur de tokens d’accès JWT */
     static accessTokens = DbAccessTokensProvider.forModel(User, {
-        expiresIn: '15 mins',
+        expiresIn: '30 days',
         prefix: 'funda_',
         table: 'auth_access_tokens',
         type: 'auth_token',

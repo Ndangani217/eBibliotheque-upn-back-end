@@ -10,7 +10,12 @@ export default class extends BaseSchema {
 
             table.timestamp('start_date', { useTz: true }).notNullable()
             table.timestamp('end_date', { useTz: true }).notNullable()
-            table.enum('status', Object.values(SubscriptionStatus)).notNullable()
+            table
+                .enum('status', Object.values(SubscriptionStatus), {
+                    useNative: true,
+                    enumName: 'subscription_status_enum',
+                })
+                .notNullable()
 
             table
                 .integer('payment_voucher_id')
@@ -21,14 +26,15 @@ export default class extends BaseSchema {
 
             table.uuid('subscriber_id').references('id').inTable('users').onDelete('CASCADE')
 
-            table.uuid('validated_by_id').references('id').inTable('users').onDelete('SET NULL')
+            table.uuid('validated_by').references('id').inTable('users').onDelete('SET NULL')
 
-            table.timestamp('created_at')
-            table.timestamp('updated_at')
+            table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
+            table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
         })
     }
 
     async down() {
         this.schema.dropTable(this.tableName)
+        this.schema.raw('DROP TYPE IF EXISTS subscription_status_enum')
     }
 }
