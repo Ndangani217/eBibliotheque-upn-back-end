@@ -1,685 +1,102 @@
 /*
 |--------------------------------------------------------------------------
-| Routes file
+| Routes File — Backend eBibliothèque UPN
 |--------------------------------------------------------------------------
-|
-| The routes file est utilisé pour définir toutes les routes HTTP.
-|
 */
 
 import router from '@adonisjs/core/services/router'
-import { namedMiddleware as middleware } from './kernel.js'
+import { namedMiddleware } from './kernel.js'
 
-const UsersController = () => import('#controllers/users_controller')
-const RoomsController = () => import('#controllers/rooms_controller')
-const ReservationsController = () => import('#controllers/reservations_controller')
-const PaymentsController = () => import('#controllers/payments_controller')
-const ConductsController = () => import('#controllers/conducts_controller')
-const SubscriptionsController = () => import('#controllers/subscriptions_controller')
+/* ==========================================================================
+   AUTHENTIFICATION
+   ========================================================================== */
+const AuthController = () => import('#controllers/auth_controller')
 
-import { DateTime } from 'luxon'
-import { Role } from '#types/role'
-
-// -------------------------
-// USERS
-// -------------------------
 router
     .group(() => {
-        router.post('/admins', [UsersController, 'createAdmin'])
-
-        // STUDENTS
-        router
-            .get('/students/search', [UsersController, 'searchStudents'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/students', [UsersController, 'getStudents'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/students/:id', [UsersController, 'getStudentById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router.post('/students', [UsersController, 'createStudent'])
-
-        router
-            .put('/students/:id', [UsersController, 'updateStudent'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.STUDENT, Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .delete('/students/:id', [UsersController, 'deleteStudent'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        // ADMINS
-        router
-            .get('/admins', [UsersController, 'getAdmins'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/admins/:id', [UsersController, 'getAdminById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/admins/:id', [UsersController, 'updateAdmin'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .delete('/admins/:id', [UsersController, 'deleteAdmin'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/admins/search', [UsersController, 'searchAdmins'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        // MANAGERS
-        router
-            .get('/managers', [UsersController, 'getManagers'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/managers/:id', [UsersController, 'getManagerById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/managers', [UsersController, 'createManager'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/managers/:id', [UsersController, 'updateManager'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .delete('/managers/:id', [UsersController, 'deleteManager'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/managers/search', [UsersController, 'searchManagers'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .patch('/managers/:id/block', [UsersController, 'block'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-
-        router
-            .patch('/managers/:id/unblock', [UsersController, 'unblock'])
-            .middleware([middleware.auth(), middleware.hasRole([Role.ADMIN])])
-
-        // PASSWORD & AUTH
-        router.post('/:id/add-password', [UsersController, 'addPassword'])
-        //router.post('/users/set-password/:token', [UsersController, 'setPasswordAfterActivation'])
-        router.post('/forgot-password', [UsersController, 'forgotPassword'])
-        router.post('/reset-password/:token', [UsersController, 'resetPassword'])
-
-        router
-            .get('/me', [UsersController, 'me'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router.post('/login', [UsersController, 'login'])
-        router
-            .post('/logout', [UsersController, 'logout'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-
-        router
-            .get('/:id/sessions/day', [UsersController, 'sessionsOfDay'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/heartbeat', async ({ auth, response }) => {
-                if (!auth.user) {
-                    return response.unauthorized({ status: 'error', message: 'Non authentifié' })
-                }
-                auth.user.lastSeenAt = DateTime.now()
-                await auth.user.save()
-                return response.ok({ status: 'success', message: 'Heartbeat enregistré' })
-            })
-            .middleware([middleware.auth(), middleware.checkBlocked()])
+        router.post('/login', [AuthController, 'storeSession'])
+        router.delete('/logout', [AuthController, 'destroySession'])
+        router.get('/me', [AuthController, 'showAuthenticatedUser'])
+        router.post('/refresh', [AuthController, 'refreshToken'])
+        router.post('/forgot-password', [AuthController, 'requestPasswordReset'])
+        router.get('/reset-password/:token', [AuthController, 'verifyResetToken'])
+        router.post('/reset-password/:token', [AuthController, 'resetPassword'])
+        router.post('/set-password/:token', [AuthController, 'setPassword'])
     })
-    .prefix('/users')
+    .prefix('/auth')
 
-// -------------------------
-// ROOMS
-// -------------------------
+/* ==========================================================================
+   MAINTENANCE
+   ========================================================================== */
+const SubscriptionCardsController = () => import('#controllers/subscription_cards_controller')
+const PaymentVouchersController = () => import('#controllers/payment_vouchers_controller')
+router.patch('/maintenance/cards/expire', [SubscriptionCardsController, 'checkExpiredCards'])
+router.patch('/maintenance/vouchers/expire', [PaymentVouchersController, 'expireVouchers'])
+
+/* ==========================================================================
+   MANAGER DASHBOARD & ADMINISTRATION
+   ========================================================================== */
+const ManagerController = () => import('#controllers/managers_controller')
+const ActivityLogsController = () => import('#controllers/activity_logs_controller')
+
 router
     .group(() => {
-        router
-            .get('/available', [RoomsController, 'getAvailableRooms'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/occupied', [RoomsController, 'getOccupiedRooms'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/search', [RoomsController, 'searchRooms'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/create', [RoomsController, 'createRoom'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/', [RoomsController, 'getRooms'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/:id', [RoomsController, 'getRoomById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/:id', [RoomsController, 'updateRoom'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .delete('/:id', [RoomsController, 'deleteRoom'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/:id/assign-student', [RoomsController, 'assignRoomStudent'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/:id/remove-student', [RoomsController, 'removeRoomStudent'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/:id/students', [RoomsController, 'getRoomStudents'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/:id/transfer-student', [RoomsController, 'transferStudentRoom'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .patch('/:id/status', [RoomsController, 'updateRoomStatus'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/:id/capacity', [RoomsController, 'getRoomCapacityInfo'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/:id/clear', [RoomsController, 'clearRoom'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
+        router.get('/dashboard', [ManagerController, 'dashboard'])
+        router.get('/payments', [ManagerController, 'payments'])
+        router.patch('/payments/:id/validate', [PaymentVouchersController, 'validatePayment'])
+        router.get('/payments/export', [ManagerController, 'exportPayments'])
+        router.get('/subscriptions', [ManagerController, 'subscriptions'])
+        router.patch('/subscriptions/:id/suspend', [ManagerController, 'suspendCard'])
+        router.get('/subscriptions/:id/print-card', [ManagerController, 'printCardBySubscription'])
+        router.get('/subscriptions/active/export', [ManagerController, 'exportActiveSubscriptions'])
+        router.get('/subscriptions/expired/export', [
+            ManagerController,
+            'exportExpiredSubscriptions',
+        ])
+        router.get('/cards', [ManagerController, 'cards'])
+        router.patch('/cards/:id/activate', [ManagerController, 'activateCard'])
+        router.patch('/cards/:id/suspend', [ManagerController, 'suspendCard'])
+        router.get('/cards/:id/print', [ManagerController, 'printCard'])
+        router.get('/subscriptions/expiring-soon', [ManagerController, 'expiringSoon'])
+        router.get('/users', [ManagerController, 'subscribers'])
+        router.post('/users/:id/send-password-reset', [ManagerController, 'sendPasswordResetLink'])
+        router.get('/activity-logs', [ActivityLogsController, 'index']).use(namedMiddleware.auth())
     })
-    .prefix('/rooms')
-// -------------------------
-// RESERVATIONS
-// -------------------------
+    .prefix('/manager')
+
+/* ==========================================================================
+   PAIEMENTS
+   ========================================================================== */
 router
     .group(() => {
-        router
-            .get('/search', [ReservationsController, 'searchByStudentName'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/status', [ReservationsController, 'getByStatus'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/', [ReservationsController, 'getAllReservations'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .post('/', [ReservationsController, 'create'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/my', [ReservationsController, 'getMyReservation'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .get('/:id', [ReservationsController, 'getById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/:id', [ReservationsController, 'update'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/:id/approve', [ReservationsController, 'approve'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/:id/reject', [ReservationsController, 'reject'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .put('/:id/cancel', [ReservationsController, 'cancel'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        router
-            .delete('/:id', [ReservationsController, 'delete'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-    })
-    .prefix('/reservations')
-
-// -------------------------
-// PAYMENTS
-// -------------------------
-router
-    .group(() => {
-        /** 1️⃣ Dashboard global (admin & manager) */
-        router
-            .get('/dashboard', [PaymentsController, 'dashboard'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 2️⃣ Recherche d’un paiement par référence */
-        router
-            .get('/reference/:reference', [PaymentsController, 'searchByReference'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 3️⃣ Paiements liés à un abonnement */
-        router
-            .get('/subscriptions/:id/payments', [PaymentsController, 'bySubscription'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 4️⃣ Total des paiements d’un abonnement */
-        router
-            .get('/subscriptions/:id/payments/total', [PaymentsController, 'totalBySubscription'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 5️⃣ Paiements d’un étudiant par période */
-        router
-            .get('/students/:studentId/payments/period', [PaymentsController, 'byStudentPeriod'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 6️⃣ Résumé des paiements d’un étudiant par période */
-        router
-            .get('/students/:studentId/payments/summary', [
-                PaymentsController,
-                'summaryByStudentPeriod',
-            ])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 7️⃣ Tous les paiements d’un étudiant (historique complet) */
-        router
-            .get('/students/:studentId/payments', [PaymentsController, 'byStudent'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 8️⃣ Liste globale paginée (admin & manager) */
-        router
-            .get('/', [PaymentsController, 'getAllPayments'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 9️⃣ Création d’un paiement (étudiant ou manager) */
-        router
-            .post('/', [PaymentsController, 'create'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.STUDENT, Role.MANAGER, Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 🔟 Détails d’un paiement spécifique */
-        router
-            .get('/:id', [PaymentsController, 'getById'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 11️⃣ Mise à jour d’un paiement (manager/admin) */
-        router
-            .put('/:id', [PaymentsController, 'update'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 12️⃣ Mise à jour du statut (validation/rejet) */
-        router
-            .patch('/:id/status', [PaymentsController, 'updateStatus'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        /** 13️⃣ Suppression d’un paiement (manager/admin) */
-        router
-            .delete('/:id', [PaymentsController, 'destroy'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
+        router.post('/vouchers/generate', [PaymentVouchersController, 'generateVoucher']).use(namedMiddleware.auth())
+        router.get('/vouchers/active', [PaymentVouchersController, 'getActiveVoucher']).use(namedMiddleware.auth())
+        router.get('/vouchers/:id/download', [PaymentVouchersController, 'downloadVoucher']).use(namedMiddleware.auth())
+        router.get('/cards/active', [SubscriptionCardsController, 'getActiveCard']).use(namedMiddleware.auth())
+        router.get('/cards/generate/:id', [SubscriptionCardsController, 'generateCard']).use(namedMiddleware.auth())
+        router.patch('/cards/:id/activate', [SubscriptionCardsController, 'activateCard']).use(namedMiddleware.auth())
     })
     .prefix('/payments')
 
-// -------------------------
-// CONDUCTS
-// -------------------------
-router
-    .group(() => {
-        router
-            .get('/', [ConductsController, 'index'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router
-            .get('/:id', [ConductsController, 'show'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router
-            .post('/', [ConductsController, 'store'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router
-            .put('/:id', [ConductsController, 'update'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router
-            .delete('/:id', [ConductsController, 'destroy'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
+// Route publique pour la vérification QR
+router.get('/payments/cards/verify/:code', [SubscriptionCardsController, 'verify'])
 
-        router
-            .get('/student/:studentId', [ConductsController, 'byStudent'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router
-            .get('/student/:studentId/stats', [ConductsController, 'statsByStudent'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-
-        router
-            .get('/status', [ConductsController, 'byStatus'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-        router
-            .put('/:id/close', [ConductsController, 'close'])
-            .middleware([middleware.auth(), middleware.checkBlocked()])
-    })
-    .prefix('/conducts')
-
-// -------------------------
-// SUBSCRIPTIONS
-// -------------------------
+/* ==========================================================================
+   UTILISATEURS
+   ========================================================================== */
+const UserController = () => import('#controllers/users_controller')
 
 router
     .group(() => {
-        router
-            .get('/students/me/subscription', [SubscriptionsController, 'me'])
-            .middleware([middleware.auth()])
-
-        // Récupérer tous les abonnements
-        router
-            .get('/', [SubscriptionsController, 'getAllSubscriptions'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        // Récupérer un abonnement par ID
-        router
-            .get('/:id', [SubscriptionsController, 'getByIdSubscription'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        // Créer un abonnement
-        router
-            .post('/', [SubscriptionsController, 'create'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        // Mettre à jour un abonnement
-        router
-            .put('/:id', [SubscriptionsController, 'update'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        // Supprimer un abonnement
-        router
-            .delete('/:id', [SubscriptionsController, 'delete'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN]),
-                middleware.checkBlocked(),
-            ])
-
-        // Récupérer les paiements liés à un abonnement
-        router
-            .get('/:id/payments', [SubscriptionsController, 'payments'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
-
-        // Récupérer les abonnements expirant dans une période (day, week, month, year)
-        router
-            .get('/expiring/list', [SubscriptionsController, 'expiring'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        // Récupérer les abonnements par statut
-        router
-            .get('/status/list', [SubscriptionsController, 'byStatus'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER]),
-                middleware.checkBlocked(),
-            ])
-
-        // Calculer le temps restant d’un abonnement
-        router
-            .get('/:id/remaining', [SubscriptionsController, 'remainingTime'])
-            .middleware([
-                middleware.auth(),
-                middleware.hasRole([Role.ADMIN, Role.MANAGER, Role.STUDENT]),
-                middleware.checkBlocked(),
-            ])
+        router.get('/', [UserController, 'index']).use(namedMiddleware.auth())
+        router.post('/register-subscriber', [UserController, 'registerSubscriber'])
+        router.get('/unverified', [UserController, 'unverified']).use(namedMiddleware.auth())
+        router.get('/:id', [UserController, 'show']).use(namedMiddleware.auth())
+        router.post('/', [UserController, 'store'])
+        router.put('/:id', [UserController, 'update']).use(namedMiddleware.auth())
+        router.patch('/:id/block', [UserController, 'block']).use(namedMiddleware.auth())
+        router.patch('/:id/unblock', [UserController, 'unblock']).use(namedMiddleware.auth())
+        router.delete('/:id', [UserController, 'destroy'])
+        router.get('/stats/global', [UserController, 'stats']).use(namedMiddleware.auth())
     })
-    .prefix('/subscriptions')
-
-const TestMailController = () => import('#controllers/test_mails_controller')
-router.get('/test-mail', [TestMailController, 'send'])
+    .prefix('/users')

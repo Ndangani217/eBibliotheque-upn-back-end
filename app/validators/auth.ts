@@ -5,21 +5,10 @@ import vine from '@vinejs/vine'
  * Route : POST /auth/login
  */
 export const LoginValidator = vine.compile(
-  vine.object({
-    email: vine.string().trim().email(),
-    password: vine.string().minLength(6),
-  })
-)
-
-/**
- * Validation pour l’activation du compte
- * Route : POST /auth/activate/:id
- */
-export const ActivateAccountValidator = vine.compile(
-  vine.object({
-    token: vine.string().trim(),
-    password: vine.string().minLength(6).confirmed(),
-  })
+    vine.object({
+        email: vine.string().trim().email(),
+        password: vine.string().minLength(6),
+    }),
 )
 
 /**
@@ -27,9 +16,9 @@ export const ActivateAccountValidator = vine.compile(
  * Route : POST /auth/forgot-password
  */
 export const RequestPasswordResetValidator = vine.compile(
-  vine.object({
-    email: vine.string().trim().email(),
-  })
+    vine.object({
+        email: vine.string().trim().email(),
+    }),
 )
 
 /**
@@ -37,7 +26,17 @@ export const RequestPasswordResetValidator = vine.compile(
  * Route : POST /auth/reset-password/:token
  */
 export const ResetPasswordValidator = vine.compile(
-  vine.object({
-    newPassword: vine.string().minLength(6).confirmed(),
-  })
+    vine.object({
+        newPassword: vine.string().minLength(6).confirmed(),
+    }),
+)
+
+/**
+ * Validation pour l’activation de compte (définition du mot de passe)
+ * Route : POST /auth/set-password
+ */
+export const SetPasswordValidator = vine.compile(
+    vine.object({
+        newPassword: vine.string().minLength(6).confirmed(),
+    }),
 )

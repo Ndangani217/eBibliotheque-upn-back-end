@@ -5,7 +5,7 @@ import PaymentVoucher from '#models/payment_voucher'
 
 export default class Transaction extends BaseModel {
     @column({ isPrimary: true })
-    declare id: string
+    declare id: number
 
     @column()
     declare bankReference: string
@@ -13,10 +13,13 @@ export default class Transaction extends BaseModel {
     @column()
     declare bankStatus: string
 
+    @column({ columnName: 'payment_voucher_id' })
+    declare paymentVoucherId: number
+
     @column.dateTime()
     declare transactionDate: DateTime
 
-    @belongsTo(() => PaymentVoucher)
+    @belongsTo(() => PaymentVoucher, { foreignKey: 'paymentVoucherId' })
     declare paymentVoucher: BelongsTo<typeof PaymentVoucher>
 
     @column.dateTime({ autoCreate: true })
